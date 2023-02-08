@@ -1,3 +1,6 @@
+from bisect import insort
+import itertools
+
 from typing import Dict, Hashable
 
 
@@ -31,3 +34,35 @@ class TabuList:
         self.offset -= 1
         if self.offset % self.cleanup_freq == 0:
             self._cleanup()
+
+
+class BestList:
+    def __init__(self, n, sorting_key=lambda x: x):
+        self.n = n
+        self.data = []
+        self.sorting_key = sorting_key
+
+    def add(self, item):
+        self.data.append(item)
+        insort(self.data, item, key=self.sorting_key)
+        self.data = self.data[:self.n]
+
+    def __getitem__(self, i):
+        return self.data[i]
+
+
+def index_it(iterable, i: int):
+    while i > 0:
+        i -= 1
+        next(iterable)
+    return next(iterable)
+
+
+def sliding_window(iterable, n=2):
+    iterables = itertools.tee(iterable, n)
+
+    for iterable, num_skipped in zip(iterables, itertools.count()):
+        for _ in range(num_skipped):
+            next(iterable, None)
+
+    return zip(*iterables)
