@@ -80,6 +80,7 @@ class WKT:
             if current_angle is not None:
                 turn = (current_angle - angle + 180) % 360 - 180
                 if abs(turn) > 90:
+                    # TODO allow second illegal turn
                     if illegal_turn_idx is None:
                         illegal_turn_idx = i
                     else:
