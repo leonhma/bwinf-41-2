@@ -1,24 +1,51 @@
-from functools import lru_cache
+from functools import lru_cache, reduce
 from math import atan2, degrees
 from os import path
-from random import choices
+from random import choice, choices
 from typing import Tuple
 
-from utils import BestList
 
 import matplotlib.pyplot as plt
 
 
-ILLEGAL_TURN_WEIGHT = 999999
+ILLEGAL_TURN_WEIGHT = 1000
 
+def show_plot(points: Tuple[Tuple[float, float]], block: bool = True):
+    """Show a plot of the given points.
+
+    Parameters
+    ----------
+    points : Tuple[Tuple[float, float]]
+        The points to plot.
+    """
+    plt.clf()
+    plt.plot(tuple(x[0] for x in points), tuple(x[1] for x in points), f'{"b" if block else "y"}o-')
+
+    def reduce_fn(acc, x):
+        coords, last, last_angle = acc
+        if last is not None:
+            angle = degrees(atan2(x[1] - last[1], x[0] - last[0]))
+        else:
+            return coords, x, None
+        if last_angle is not None:
+            current_angle = (last_angle - angle + 180) % 360 - 180
+            if abs(current_angle) > 90:
+                coords.append(last)
+        return coords, x, angle
+    to_highlight = reduce(reduce_fn, points, ([], None, None))[0]
+    plt.plot(tuple(x[0] for x in to_highlight), tuple(x[1] for x in to_highlight), 'ro')
+    plt.pause(0.001)
+    plt.show(block=block)
 
 class WKT:
     outposts: Tuple[Tuple[float, float]]
     max_n_of_its_wo_improv: int
-    top_n: int
+    explore_its: int
 
     def __init__(
-            self, fp: str, max_n_of_its_wo_improv: int = 1000, top_n: int = 10):
+            self,
+            fp: str, max_n_of_its_wo_improv: int = 1000,
+            explore_its: int = 30):
         """Initialize the WKT class.
 
         Parameters
@@ -26,12 +53,13 @@ class WKT:
         fp : str
             The path to the file containing the outposts.
         max_n_of_its_wo_improv : int, optional
-            The maximum number of iterations without improvement, by default 10000.
-        top_n : int, optional
-            The number of top genomes to keep track of, by default 10.
+            The maximum number of iterations without improvement, by default 1000
+        explore_its : int, optional
+            The number of iterations to further explore infeasible solutions for, by default 30
         """
         self.max_n_of_its_wo_improv = max_n_of_its_wo_improv
-        self.top_n = top_n
+        self.explore_its = explore_its
+
         with open(path.join(
             path.dirname(path.abspath(__file__)),
             fp
@@ -60,7 +88,7 @@ class WKT:
             (self.outposts[p1][1] - self.outposts[p2][1]) ** 2) ** 0.5
 
     def _angle(self, p1: int, p2: int) -> float:
-        """Return the CCW angle of the flight line to the x-axis. ([-180, 180])
+        """Return the closest-to-zero angle of the flight line to the x-axis. ([-180, 180])
 
         Hint
         ----
@@ -81,7 +109,7 @@ class WKT:
         return degrees(
             atan2(
                 self.outposts[p2][1] - self.outposts[p1][1],
-                abs(self.outposts[p2][0] - self.outposts[p1][0])))
+                self.outposts[p2][0] - self.outposts[p1][0]))
 
     def _mutability(self, genome: Tuple[int, ...]) -> Tuple[float, ...]:
         """Return the mutation probability of each point in the genome.
@@ -103,8 +131,8 @@ class WKT:
             # angle calculation
             angle = self._angle(genome[i - 1], genome[i])
             if lastAngle is not None:
-                currentAngle = abs(angle - lastAngle)
-                if currentAngle > 90:
+                currentAngle = (lastAngle - angle + 180) % 360 - 180
+                if abs(currentAngle) > 90:
                     mutability[i - 1] = ILLEGAL_TURN_WEIGHT
             lastAngle = angle
 
@@ -120,8 +148,8 @@ class WKT:
 
         return tuple(map(lambda x: x / (sum(mutability)), mutability))
 
-    def _fitness(self, genome: Tuple[int]) -> float:
-        """Return the fitness of a genome.
+    def _cost(self, genome: Tuple[int]) -> float:
+        """Return the fitness of a genome. (lower is better)
 
         Parameters
         ----------
@@ -140,8 +168,8 @@ class WKT:
             # angle calculation
             angle = self._angle(genome[i - 1], genome[i])
             if lastAngle is not None:
-                currentAngle = abs(angle - lastAngle)
-                if currentAngle > 90:
+                currentAngle = (lastAngle - angle + 180) % 360 - 180
+                if abs(currentAngle) > 90:
                     weight += ILLEGAL_TURN_WEIGHT
             lastAngle = angle
 
@@ -165,11 +193,13 @@ class WKT:
         """
         [s1] = choices(tuple(i for i in range(len(genome))),
                        self._mutability(genome), k=1)
-        [s2] = choices(tuple(i for i in range(len(genome))), tuple(
-            map(lambda x: 1 / x, self._mutability(genome))), k=1)
+        s2 = choice(tuple(i for i in range(len(genome))))
         new_genome = list(genome)
         new_genome[s1], new_genome[s2] = new_genome[s2], new_genome[s1]
         return tuple(new_genome)
+
+    def _cooldown(self, temp: float) -> float:
+        return temp * self.cooldown_multiplier
 
     def solve(self) -> Tuple[Tuple[float, float]]:
         """Return the optimized sequence.
@@ -179,25 +209,27 @@ class WKT:
         Tuple[Tuple[float, float]]
             The sequence of outposts to visit.
         """
-        n_of_its_wo_improvement = 0
-        best = BestList(self.top_n, self._fitness)
-        best.add(tuple(i for i in range(len(self.outposts))))
+        n_of_its_wo_improv = 0
+        best = tuple(i for i in range(len(self.outposts)))
+        best_cost = self._cost(best)
+        while n_of_its_wo_improv < self.max_n_of_its_wo_improv:
+            current = best
+            for _ in range(self.explore_its):
+                current = self._mutate(current)
+                current_cost = self._cost(current)
+                if current_cost < best_cost:
+                    best = current
+                    best_cost = current_cost
+                    print(f'found better solution with cost {best_cost}')
+                    n_of_its_wo_improv = 0
+                    show_plot(tuple(self.outposts[i] for i in best), False)
+                    break
+            n_of_its_wo_improv += 1
 
-        while n_of_its_wo_improvement < self.max_n_of_its_wo_improv:
-            n_of_its_wo_improvement += 1
-            for genome in best:
-                new_genome = self._mutate(genome)
-                if self._fitness(new_genome) < self._fitness(genome):
-                    best.add(new_genome)
-                    n_of_its_wo_improvement = 0
-                    print(
-                        f'found better genome. new fitness {self._fitness(new_genome)}')
-
-        return tuple(self.outposts[i] for i in best[0])
+        return tuple(self.outposts[i] for i in best)
 
 
-wkt = WKT('beispieldaten/wenigerkrumm2.txt')
+wkt = WKT('beispieldaten/wenigerkrumm1.txt', 1000, 60)
 solution = wkt.solve()
 
-plt.plot(tuple(x[0] for x in solution), tuple(x[1] for x in solution), 'o-')
-plt.show()
+show_plot(solution)
