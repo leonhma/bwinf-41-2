@@ -1,5 +1,6 @@
 from functools import lru_cache
-from math import atan2, degrees
+from itertools import chain
+from math import atan2, copysign, degrees
 from os import path
 from typing import List, Tuple
 
@@ -11,41 +12,53 @@ class Counter:
     """A custom counter class."""
     n: int
     counter: List[int]
-    last_increment: int
+    last_increment_idx: int
+    needs_increment: bool
 
     def __init__(self, n: int):
         self.n = n
         self.counter = [0] * n
-        self.last_increment = 0
+        self.last_increment_idx = 0
+        self.needs_increment = False
 
-    def increment(self, idx: int = 0):
+    def increment(self, idx: int = None):
         """Increment the counter.
 
         Parameters
         ----------
         idx : int, optional
-            The index to increment, by default 0.
+            The index to increment, by default `-1`.
         """
+        if idx is None:
+            idx = self.n - 1
+        else:
+            self.counter = self.counter[:idx + 1] + [0] * (self.n - idx - 1)
+
         self.counter[idx] += 1
-        self.last_increment = idx
-        for i in range(idx, self.n):
-            if self.counter[i] > i:
+        self.last_increment_idx = idx
+
+        for i in range(idx, -1, -1):
+            if self.counter[i] >= (self.n - i):
                 self.counter[i] = 0
-                if i + 1 < self.n:
-                    self.counter[i + 1] += 1
-                    self.last_increment = i + 1
+                if i > 0:
+                    self.counter[i - 1] += 1
+                    self.last_increment_idx = i - 1
                 else:
                     raise StopIteration
             else:
                 break
 
     def carry(self):
-        self.increment(self.last_increment)
-        self.counter = self.counter[:self.last_increment + 1] + [0] * (self.n - self.last_increment - 1)
+        self.increment(self.last_increment_idx)
+        self.counter = self.counter[:self.last_increment_idx + 1] \
+            + [0] * (self.n - self.last_increment_idx - 1)
+        self.needs_increment = False
 
     def __next__(self):
-        self.increment()
-        return self.counter
+        if self.needs_increment:
+            self.increment()
+        self.needs_increment = True
+        return tuple(self.counter)
 
 
 class WKT:
@@ -70,6 +83,7 @@ class WKT:
                                   for line in f.readlines())  # load outposts from file
 
     def show(self, points: Tuple[int, ...], other:  Tuple[int, ...] = ()):
+        # TODO highlight sharp angles
         plt.clf()
         G = nx.Graph()
         G.add_edges_from([(points[i], points[i+1]) for i in range(len(points)-1)])
@@ -124,6 +138,23 @@ class WKT:
                 self.outposts[p2][1] - self.outposts[p1][1],
                 self.outposts[p2][0] - self.outposts[p1][0]))
 
+    @lru_cache(maxsize=None)
+    def get_next(self,
+                 sequence: Tuple[int, ...],
+                 available: List[int]
+                 ) -> Tuple[Tuple[int, float], ...]:
+        return tuple(
+            sorted(
+                filter(lambda x: -90 <= ((x[3] + 180) % 360 - 180) <= 90, (
+                    (i,
+                     add_pos,
+                     self._distance(sequence[idx], i) if sequence else float('inf'),
+                     self._angle(sequence[idx + copysign(1, idx)]) - self._angle(sequence[idx], i)
+                     if len(sequence > 1) else 0)
+                    for i in available
+                    for idx, add_pos in ((0, 0), (-1, len(sequence))))
+                ), key=lambda x: x[2]))
+
 
     def solve(self) -> Tuple[Tuple[float, float]]:
         """Return the optimized sequence.
@@ -133,6 +164,32 @@ class WKT:
         Tuple[Tuple[float, float]]
             The sequence of outposts to visit.
         """
+        c = Counter(len(self.outposts))
+
+        sequence = []
+
+        while True:
+            try:
+                idx = next(c)
+            except StopIteration:
+                break
+
+            sequence = []
+            available = list(range(len(self.outposts)))
+            weight = 0
+
+            for i in idx:
+                nexts = self.get_next(tuple(sequence), tuple(available))
+                if not nexts:
+                    break
+                next_, add_pos, distance, _ = nexts[i]
+                sequence.insert(add_pos, next_)
+                available.remove(next_)
+                weight += distance
+
+            self.show(sequence, available)
+
+
         
 
 
