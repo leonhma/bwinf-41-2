@@ -4,7 +4,7 @@ from math import atan2, degrees
 from os import path
 from random import choice, choices
 import time
-from typing import Tuple
+from typing import List, Tuple
 import networkx as nx
 
 
@@ -12,8 +12,6 @@ import matplotlib.pyplot as plt
 
 class WKT:
     outposts: Tuple[Tuple[float, float]]
-    max_n_of_its_wo_improv: int
-    explore_its: int
 
     def __init__(
             self,
@@ -87,6 +85,11 @@ class WKT:
             atan2(
                 self.outposts[p2][1] - self.outposts[p1][1],
                 self.outposts[p2][0] - self.outposts[p1][0]))
+    
+    def _get_n_closest(self, p1: int, available: List[int], n: int) -> Tuple[Tuple[int, float], ...]:
+        vs = tuple((i, self._distance(p1, i)) for i in available)
+        return tuple(sorted(vs, key=lambda x: x[1]))[:n]
+
 
     def solve(self) -> Tuple[Tuple[float, float]]:
         """Return the optimized sequence.
@@ -96,19 +99,7 @@ class WKT:
         Tuple[Tuple[float, float]]
             The sequence of outposts to visit.
         """
-        to_add = [i for i in range(len(self.outposts)) if i != 0]
-        sequence = [0]
-        print(f'{sequence=}, {to_add=}')
-
-        while to_add:
-            next_ = min(chain((i, self._distance(sequence[idx], i), add_pos) for i in to_add for idx, add_pos in ((0, 0), (-1, len(sequence)))), key=lambda x: x[1])
-            sequence.insert(next_[2], next_[0])
-            to_add.remove(next_[0])
-            self.show(sequence, to_add)
-
-            
-            
-        return tuple(self.outposts[i] for i in sequence)
+        
 
 
 wkt = WKT('beispieldaten/wenigerkrumm2.txt')

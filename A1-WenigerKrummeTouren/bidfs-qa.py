@@ -1,19 +1,55 @@
-from functools import lru_cache, reduce
-from itertools import chain
+from functools import lru_cache
 from math import atan2, degrees
 from os import path
-from random import choice, choices
-import time
-from typing import Tuple
+from typing import List, Tuple
+
+import matplotlib.pyplot as plt
 import networkx as nx
 
 
-import matplotlib.pyplot as plt
+class Counter:
+    """A custom counter class."""
+    n: int
+    counter: List[int]
+    last_increment: int
+
+    def __init__(self, n: int):
+        self.n = n
+        self.counter = [0] * n
+        self.last_increment = 0
+
+    def increment(self, idx: int = 0):
+        """Increment the counter.
+
+        Parameters
+        ----------
+        idx : int, optional
+            The index to increment, by default 0.
+        """
+        self.counter[idx] += 1
+        self.last_increment = idx
+        for i in range(idx, self.n):
+            if self.counter[i] > i:
+                self.counter[i] = 0
+                if i + 1 < self.n:
+                    self.counter[i + 1] += 1
+                    self.last_increment = i + 1
+                else:
+                    raise StopIteration
+            else:
+                break
+
+    def carry(self):
+        self.increment(self.last_increment)
+        self.counter = self.counter[:self.last_increment + 1] + [0] * (self.n - self.last_increment - 1)
+
+    def __next__(self):
+        self.increment()
+        return self.counter
+
 
 class WKT:
     outposts: Tuple[Tuple[float, float]]
-    max_n_of_its_wo_improv: int
-    explore_its: int
 
     def __init__(
             self,
@@ -32,7 +68,7 @@ class WKT:
         ), 'r') as f:
             self.outposts = tuple(tuple(map(float, line.split()))
                                   for line in f.readlines())  # load outposts from file
-            
+
     def show(self, points: Tuple[int, ...], other:  Tuple[int, ...] = ()):
         plt.clf()
         G = nx.Graph()
@@ -88,6 +124,7 @@ class WKT:
                 self.outposts[p2][1] - self.outposts[p1][1],
                 self.outposts[p2][0] - self.outposts[p1][0]))
 
+
     def solve(self) -> Tuple[Tuple[float, float]]:
         """Return the optimized sequence.
 
@@ -96,19 +133,7 @@ class WKT:
         Tuple[Tuple[float, float]]
             The sequence of outposts to visit.
         """
-        to_add = [i for i in range(len(self.outposts)) if i != 0]
-        sequence = [0]
-        print(f'{sequence=}, {to_add=}')
-
-        while to_add:
-            next_ = min(chain((i, self._distance(sequence[idx], i), add_pos) for i in to_add for idx, add_pos in ((0, 0), (-1, len(sequence)))), key=lambda x: x[1])
-            sequence.insert(next_[2], next_[0])
-            to_add.remove(next_[0])
-            self.show(sequence, to_add)
-
-            
-            
-        return tuple(self.outposts[i] for i in sequence)
+        
 
 
 wkt = WKT('beispieldaten/wenigerkrumm2.txt')
