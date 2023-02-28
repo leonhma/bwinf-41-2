@@ -10,46 +10,21 @@ from typing import Tuple
 import matplotlib.pyplot as plt
 
 
-def show_plot(points: Tuple[Tuple[float, float]], block: bool = True):
-    """Show a plot of the given points.
-
-    Parameters
-    ----------
-    points : Tuple[Tuple[float, float]]
-        The points to plot.
-    """
-    plt.clf()
-    plt.plot(tuple(x[0] for x in points), tuple(x[1] for x in points), f'{"b" if block else "y"}o-')
-
-    def reduce_fn(acc, x):
-        coords, last, last_angle = acc
-        if last is not None:
-            angle = degrees(atan2(x[1] - last[1], x[0] - last[0]))
-        else:
-            return coords, x, None
-        if last_angle is not None:
-            current_angle = (last_angle - angle + 180) % 360 - 180
-            if abs(current_angle) > 90:
-                coords.append(last)
-        return coords, x, angle
-    to_highlight = reduce(reduce_fn, points, ([], None, None))[0]
-    plt.plot(tuple(x[0] for x in to_highlight), tuple(x[1] for x in to_highlight), 'ro')
-    plt.pause(0.001)
-    plt.show(block=block)
-
-
 class WKT:
     outposts: Tuple[Tuple[float, float]]
     start_temperature: float
-    restart_after_n_its_wo_improv: int
-    max_restart_n: int
+    end_temperature: float
+    adjustment_factor: float
+    delta_temp_stabilized_threshold: float
+    # TODO maybe multiple runs / restart?
 
     def __init__(
             self,
             fp: str,
-            start_temperature: float = 10000,
-            restart_after_n_its_wo_improv: int = 1000,
-            max_restart_n: int = 10):
+            start_temperature: float = 10,
+            end_temperature: float = 100,
+            adjustment_factor: float = 0.95,
+            delta_temp_stabilized_threshold: float = 1):
         """Initialize the WKT class.
 
         Parameters
@@ -58,15 +33,17 @@ class WKT:
             The path to the file containing the outposts.
         start_temperature : float, optional
             The initial temperature of the simulated annealing algorithm, by default 10000
-        restart_after_n_its_wo_improv : int, optional
-            The number of iterations without improvement after which the algorithm restarts,
-            by default 1000
-        max_restart_n : int, optional
-            The maximum number of restarts, by default 10
+        end_temperature : float, optional
+            The final temperature of the simulated annealing algorithm, by default 100
+        adjustment_factor : float, optional
+            The factor by which the temperature is adjusted each iteration, by default 0.95
+        delta_temp_stabilized_threshold : float, optional
+            The threshold for the temperature change to be considered stable, by default 1
         """
         self.start_temperature = start_temperature
-        self.restart_after_n_its_wo_improv = restart_after_n_its_wo_improv
-        self.max_restart_n = max_restart_n
+        self.end_temperature = end_temperature
+        self.adjustment_factor = adjustment_factor
+        self.delta_temp_stabilized_threshold = delta_temp_stabilized_threshold
 
         with open(path.join(
             path.dirname(path.abspath(__file__)),
@@ -142,7 +119,7 @@ class WKT:
             if lastAngle is not None:
                 currentAngle = (lastAngle - angle + 180) % 360 - 180
                 if abs(currentAngle) > 90:
-                    weight += 1000000
+                    weight += 999
             lastAngle = angle
 
             # weight calculation
@@ -242,41 +219,67 @@ class WKT:
         sequence = list(range(len(self.outposts)))
         shuffle(sequence)
 
+        temps = []
+        costs = []
+        n = 0
+
         # optimize using simulated annealing
-        global_best = tuple(sequence)
-        global_best_cost = self._cost(global_best)
+        temp = self.end_temperature + 10
+        delta_temp = float('inf')
+        delta_cost_total = 0
+        delta_entropy_total = 0
+        current_cost = self._cost(sequence)
 
-        n_restart = 0
-        restarting = True
-        while restarting and n_restart < self.max_restart_n:
-            restarting = False
+        while temp > self.end_temperature or delta_temp > self.delta_temp_stabilized_threshold:
+            # -----
+            temps.append(temp)
+            costs.append(current_cost)
+            n += 1
+            # -----
 
-            temp = self.start_temperature
-            current = deepcopy(sequence)
-            current_cost = self._cost(current)
-            n_of_its_wo_improvement = 0
-            while temp > 0:
-                new_sequence = self._mutate(sequence)
-                new_cost = self._cost(new_sequence)
-                prob = 1 if new_cost < current_cost else exp((current_cost - new_cost) / temp)
-                if random() < prob:
-                    current = new_sequence
-                    current_cost = new_cost
-                    if current_cost < global_best_cost:
-                        global_best = current
-                        global_best_cost = current_cost
-                n_of_its_wo_improvement += 1
-                if n_of_its_wo_improvement > self.restart_after_n_its_wo_improv:
-                    print('restarting')
-                    n_restart += 1
-                    restarting = True
-                    break
-                temp = self._cooldown(temp)
+            new_sequence = self._mutate(sequence)
+            new_cost = self._cost(new_sequence)
+            delta_cost = new_cost - current_cost
+            prob = exp(-delta_cost / temp)
 
-        return tuple(self.outposts[i] for i in global_best)
+            if random() < prob:
+                sequence = new_sequence
+                current_cost = new_cost
+                delta_cost_total += delta_cost
+            if delta_cost > 0:
+                delta_entropy_total -= delta_cost / temp
+            if delta_cost_total >= 0 or delta_entropy_total == 0:
+                delta_temp = temp - self.start_temperature
+                temp = self.start_temperature
+            else:
+                new_temp = self.adjustment_factor * (delta_cost_total / delta_entropy_total)
+                delta_temp = temp - new_temp
+                temp = new_temp
+
+        points = tuple(self.outposts[i] for i in sequence)
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
+        ax1.plot(tuple(x[0] for x in points), tuple(x[1] for x in points), 'bo-')
+
+        def reduce_fn(acc, x):
+            coords, last, last_angle = acc
+            if last is not None:
+                angle = degrees(atan2(x[1] - last[1], x[0] - last[0]))
+            else:
+                return coords, x, None
+            if last_angle is not None:
+                current_angle = (last_angle - angle + 180) % 360 - 180
+                if abs(current_angle) > 90:
+                    coords.append(last)
+            return coords, x, angle
+        to_highlight = reduce(reduce_fn, points, ([], None, None))[0]
+        ax1.plot(tuple(x[0] for x in to_highlight), tuple(x[1] for x in to_highlight), 'ro')
+
+        ax3.plot(temps, range(n))
+        ax4.plot(costs, range(n))
+
+        plt.show(block=True)
+        return tuple(self.outposts[i] for i in sequence)
 
 
-wkt = WKT('beispieldaten/wenigerkrumm4.txt', 10000, 10000, 10)
+wkt = WKT('beispieldaten/wenigerkrumm1.txt')
 solution = wkt.solve()
-
-show_plot(solution)
