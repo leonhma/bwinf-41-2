@@ -5,7 +5,7 @@ Np hard
 custom neighbor selection
 greedy -> thermodynamic simulated annealing
 
-kirkpatrick et al.
+In the formulation of the method by Kirkpatrick et al., the acceptance probability function $P(e,e',T)$ was defined as $1$ if $e'<e$, and $\exp(-(e'-e)/T)$ otherwise.
 
 
 thermodynamic simulated annealing

@@ -240,7 +240,7 @@ class WKT:
             new_sequence = self._mutate(sequence)
             new_cost = self._cost(new_sequence)
             delta_cost = new_cost - current_cost
-            prob = exp(-delta_cost / temp)
+            prob = 1 if delta_cost < 0 else exp(-delta_cost / temp)
 
             if random() < prob:
                 sequence = new_sequence
@@ -281,5 +281,5 @@ class WKT:
         return tuple(self.outposts[i] for i in sequence)
 
 
-wkt = WKT('beispieldaten/wenigerkrumm1.txt')
+wkt = WKT('beispieldaten/wenigerkrumm2.txt')
 solution = wkt.solve()
