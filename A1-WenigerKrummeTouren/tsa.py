@@ -1,10 +1,10 @@
 from functools import lru_cache, reduce
 from itertools import chain
-from math import atan2, degrees, exp
 from os import path
-from random import choices, random, shuffle
+from random import choices, random
 from time import time
 from typing import Tuple
+import numpy as np
 
 
 import matplotlib.pyplot as plt
@@ -103,7 +103,7 @@ class WKT:
             (self.outposts[p1][1] - self.outposts[p2][1]) ** 2) ** 0.5
 
     @lru_cache(maxsize=None)
-    def _angle(self, p1: int, p2: int) -> float:
+    def _angle(self, p1: int, p2: int, p3: int) -> float:
         """Return the closest-to-zero angle of the flight line to the x-axis. ([-180, 180])
 
         Hint
@@ -116,16 +116,22 @@ class WKT:
             The index of the first point.
         p2 : int
             The index of the second point.
+        p3 : int
+            The index of the third point.
 
         Returns
         -------
         float
             The angle between the two points.
         """
-        return degrees(
-            atan2(
-                self.outposts[p2][1] - self.outposts[p1][1],
-                self.outposts[p2][0] - self.outposts[p1][0]))
+        a = np.array(self.outposts[p1])
+        b = np.array(self.outposts[p2])
+        c = np.array(self.outposts[p3])
+
+        ba = a - b
+        bc = c - b
+
+        return np.arccos(np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc)))
 
     def _cost(self, sequence: Tuple[int]) -> float:
         """Return the fitness of a sequence. (lower is better)
@@ -140,17 +146,13 @@ class WKT:
         float
             The fitness of the sequence.
         """
-        lastAngle = None
         weight = 0
 
         for i in range(1, len(sequence)):
             # angle calculation
-            angle = self._angle(sequence[i - 1], sequence[i])
-            if lastAngle is not None:
-                currentAngle = (lastAngle - angle + 180) % 360 - 180
-                if abs(currentAngle) > 90:
+            if i >= 2:
+                if abs(self._angle(sequence[i - 2], sequence[i - 1], sequence[i])) > 90:
                     weight += 1000
-            lastAngle = angle
 
             # weight calculation
             weight += self._distance(sequence[i - 1], sequence[i])
@@ -170,18 +172,14 @@ class WKT:
         Tuple[float, ...]
             The mutation probability of each point in the sequence. (normalized to a sum of 1)
         """
-        lastAngle = None
         mutability = [1] * len(sequence)
         illegal_turn_indices = []
 
         for i in range(1, len(sequence)):
             # angle calculation
-            angle = self._angle(sequence[i - 1], sequence[i])
-            if lastAngle is not None:
-                currentAngle = (lastAngle - angle + 180) % 360 - 180
-                if abs(currentAngle) > 90:
+            if i >= 2:
+                if abs(self._angle(sequence[i - 2], sequence[i - 1], sequence[i])) > 90:
                     illegal_turn_indices.append(i - 1)
-            lastAngle = angle
 
             # weight calculation
             currentWeight = self._distance(sequence[i - 1], sequence[i])
@@ -333,7 +331,7 @@ class WKT:
                 new_sequence = self._mutate(sequence, self.mutate_mode, self.weight_mode)
                 new_cost = self._cost(new_sequence)
                 delta_cost = new_cost - current_cost
-                prob = 1 if delta_cost < 0 else exp(-delta_cost / temp)
+                prob = 1 if delta_cost < 0 else np.exp(-delta_cost / temp)
 
                 if random() < prob:
                     sequence = new_sequence
@@ -367,33 +365,36 @@ class WKT:
         axs['graph'].plot(tuple(x[0] for x in points), tuple(x[1] for x in points), 'bo-')
 
         def reduce_fn(acc, x):
-            coords, last, last_angle = acc
-            if last is not None:
-                angle = degrees(atan2(x[1] - last[1], x[0] - last[0]))
-            else:
-                return coords, x, None
-            if last_angle is not None:
-                current_angle = (last_angle - angle + 180) % 360 - 180
-                if abs(current_angle) > 90:
+            coords, last, llast = acc
+            if last and llast:
+                if abs(self._angle(llast, last, x)) > 90:
                     coords.append(last)
-            return coords, x, angle
-        to_highlight = reduce(reduce_fn, points, ([], None, None))[0]
+
+            return coords, x, last
+        to_highlight = [self.outposts[i] for i in reduce(reduce_fn, best_sequence, ([], None, None))[0]]
         axs['graph'].plot(tuple(x[0] for x in to_highlight), tuple(x[1] for x in to_highlight),
                           'ro')
 
         axs['temp'].set_title("Temperature")
         for temps in all_temps:
-            axs['temp'].plot(temps, color='0.7', linestyle="dashed", zorder=0.5)
-        axs['temp'].plot(temps[all_best_temp_idx], color='blue', zorder=1)
+            axs['temp'].plot(temps, '--', color='0.7', zorder=0.5)
+        axs['temp'].plot(all_temps[all_best_temp_idx], '-', color='blue', zorder=1)
         axs['cost'].set_title("Cost")
         for costs in all_costs:
-            axs['cost'].plot(temps, color='0.7', linestyle="dashed", zorder=0.5)
-        axs['cost'].plot(costs[all_best_cost_idx], color='blue', zorder=1)
+            axs['cost'].plot(costs, '--', color='0.7', zorder=0.5)
+        axs['cost'].plot(all_costs[all_best_cost_idx], '-', color='blue', zorder=1)
 
         plt.show(block=True)
         return tuple(self.outposts[i] for i in best_sequence)
 
 
-wkt = WKT('beispieldaten/wenigerkrumm2.txt', 1000, 0.1, 0.95, 1, 2, 1, 5)
+wkt = WKT('beispieldaten/wenigerkrumm4.txt',
+          start_temperature=100,
+          end_temperature=1,
+          adjustment_factor=0.95,
+          delta_temp_stabilized_threshold=0.5,
+          mutate_mode=1,
+          weight_mode=0,
+          n_runs=5,
+          max_runtime=30)
 solution = wkt.solve()
-print(solution)
