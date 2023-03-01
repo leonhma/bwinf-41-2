@@ -1,9 +1,9 @@
-from copy import deepcopy
 from functools import lru_cache, reduce
 from itertools import chain
 from math import atan2, degrees, exp
 from os import path
-from random import choice, choices, random, shuffle
+from random import choices, random, shuffle
+from time import time
 from typing import Tuple
 
 
@@ -16,7 +16,10 @@ class WKT:
     end_temperature: float
     adjustment_factor: float
     delta_temp_stabilized_threshold: float
-    # TODO maybe multiple runs / restart?
+    mutate_mode: int
+    weight_mode: int
+    n_runs: int
+    max_runtime: float
 
     def __init__(
             self,
@@ -24,7 +27,11 @@ class WKT:
             start_temperature: float = 10,
             end_temperature: float = 100,
             adjustment_factor: float = 0.95,
-            delta_temp_stabilized_threshold: float = 1):
+            delta_temp_stabilized_threshold: float = 1,
+            mutate_mode: int = 0,
+            weight_mode: int = 0,
+            n_runs: int = 10,
+            max_runtime: float = 30):
         """Initialize the WKT class.
 
         Parameters
@@ -39,11 +46,34 @@ class WKT:
             The factor by which the temperature is adjusted each iteration, by default 0.95
         delta_temp_stabilized_threshold : float, optional
             The threshold for the temperature change to be considered stable, by default 1
+        mutate_mode : int
+            The mode of mutation to use, by default 0.
+            0: Remove city and insert it at a random position
+            1: Swap two cities
+            2: Flip a random segment of the sequence
+            3: Move a random segment of the sequence to a random position
+        weight_mode : int
+            The mode of weight calculation to use, by default 0.
+            0: Uniform weight
+            1: Weight by distance and illegal turns
+        n_runs : int
+            The number of runs to perform, by default 10
+        max_runtime : float
+            The maximum runtime of the algorithm in seconds, by default 30
+
+        Note
+        ----
+            weight_mode is ignored if mutate_mode is 2 or 3.
+
         """
         self.start_temperature = start_temperature
         self.end_temperature = end_temperature
         self.adjustment_factor = adjustment_factor
         self.delta_temp_stabilized_threshold = delta_temp_stabilized_threshold
+        self.mutate_mode = mutate_mode
+        self.weight_mode = weight_mode
+        self.n_runs = n_runs
+        self.max_runtime = max_runtime
 
         with open(path.join(
             path.dirname(path.abspath(__file__)),
@@ -119,7 +149,7 @@ class WKT:
             if lastAngle is not None:
                 currentAngle = (lastAngle - angle + 180) % 360 - 180
                 if abs(currentAngle) > 90:
-                    weight += 999
+                    weight += 1000
             lastAngle = angle
 
             # weight calculation
@@ -159,11 +189,13 @@ class WKT:
             mutability[i - 1] += currentWeight * 0.5
 
         # replace all illegal turn weights with the calculated value
-        illegal_turn_weight = sum(
-            filter(lambda x: x, mutability)
-        )
-        for i in illegal_turn_indices:
-            mutability[i] = illegal_turn_weight
+        if illegal_turn_indices:
+            illegal_turn_weight = sum(
+                filter(lambda x: x, mutability)
+            ) / len(illegal_turn_indices)
+
+            for i in illegal_turn_indices:
+                mutability[i] = illegal_turn_weight
 
         # double the weights of the first and last point
         # since they dont have a previous or next point
@@ -173,24 +205,71 @@ class WKT:
         return tuple(map(lambda x: x / (sum(mutability)), mutability))
 
     # TODO: test swapping vs removing and inserting vs random segment flips
-    def _mutate(self, sequence: Tuple[int, ...]) -> Tuple[int, ...]:
+    def _mutate(self, sequence: Tuple[int, ...],
+                mutate_mode: int,
+                weight_mode: int) -> Tuple[int, ...]:
         """Mutate a sequence by removing and inserting a city.
 
         Parameters
         ----------
         sequence : Tuple[int, ...]
             The sequence to mutate.
+        mutate_mode : int
+            The mode of mutation to use, by default 0.
+            0: Remove city and insert it at a random position
+            1: Swap two cities
+            2: Flip a random segment of the sequence
+            3: Move a random segment of the sequence to a random position
+        weight_mode : int
+            The mode of weight calculation to use, by default 0.
+            0: Uniform weight
+            1: Weight by distance and illegal turns
+
+        Note
+        ----
+            The weight mode is ignored if mutate_mode is 2 or 3.
 
         Returns
         -------
         Tuple[int, ...]
             The mutated sequence.
         """
-        [s1] = choices(tuple(i for i in range(len(sequence))),
-                       self._mutability(sequence), k=1)
-        s2 = choice(tuple(i for i in range(len(sequence) + 1)))
+        probs = self._mutability(sequence) if weight_mode else tuple(1 for _ in sequence)
+        match mutate_mode:
+            case 0:
+                return self._mutate_remove_insert(sequence, probs)
+            case 1:
+                return self._mutate_swap(sequence, probs)
+            case 2:
+                return self._mutate_flip(sequence)
+            case 3:
+                return self._mutate_move(sequence)
+
+    def _mutate_remove_insert(self, sequence: Tuple[int, ...],
+                              probs: Tuple[float, ...]) -> Tuple[int, ...]:
+        s1, s2 = choices(tuple(i for i in range(len(sequence))),
+                         probs, k=2)
         new_sequence = list(sequence)
         new_sequence.insert(s2, new_sequence.pop(s1))
+        return tuple(new_sequence)
+
+    def _mutate_swap(self, sequence: Tuple[int, ...], probs: Tuple[float, ...]) -> Tuple[int, ...]:
+        s1, s2 = choices(tuple(i for i in range(len(sequence))), probs, k=2)
+        new_sequence = list(sequence)
+        new_sequence[s1], new_sequence[s2] = new_sequence[s2], new_sequence[s1]
+        return tuple(new_sequence)
+
+    def _mutate_flip(self, sequence: Tuple[int, ...]) -> Tuple[int, ...]:
+        s1, s2 = choices(tuple(i for i in range(len(sequence))), k=2)
+        new_sequence = list(sequence)
+        new_sequence[s1:s2] = new_sequence[s2:s1:-1]
+        return tuple(new_sequence)
+
+    def _mutate_move(self, sequence: Tuple[int, ...]) -> Tuple[int, ...]:
+        s1, s2, s3 = sorted(choices(tuple(i for i in range(len(sequence))), k=3))
+        new_sequence = list(sequence)
+        new_sequence = new_sequence[:s1] + new_sequence[s2:s3] + \
+            new_sequence[s1:s2] + new_sequence[s3:]
         return tuple(new_sequence)
 
     def solve(self) -> Tuple[Tuple[float, float]]:
@@ -203,62 +282,89 @@ class WKT:
         """
 
         # create initial sequence using greedy algorithm
-        # to_add = [i for i in range(len(self.outposts)) if i != 0]
-        # sequence = [0]
+        to_add = [i for i in range(len(self.outposts)) if i != 0]
+        initial_sequence = [0]
 
-        # while to_add:
-        #     next_ = min(
-        #         chain(
-        #             (i, self._distance(sequence[idx], i), add_pos)
-        #             for i in to_add
-        #             for idx, add_pos in ((0, 0), (-1, len(sequence)))
-        #         ), key=lambda x: x[1])
-        #     sequence.insert(next_[2], next_[0])
-        #     to_add.remove(next_[0])
+        while to_add:
+            next_ = min(
+                chain(
+                    (i, self._distance(initial_sequence[idx], i), add_pos)
+                    for i in to_add
+                    for idx, add_pos in ((0, 0), (-1, len(initial_sequence)))
+                ), key=lambda x: x[1])
+            initial_sequence.insert(next_[2], next_[0])
+            to_add.remove(next_[0])
 
-        sequence = list(range(len(self.outposts)))
-        shuffle(sequence)
+        best_sequence = None
+        best_cost = float('inf')
+        all_temps = []
+        all_best_temp_idx = None
+        all_costs = []
+        all_best_cost_idx = None
+        best_n = None
+        start_time = time()
 
-        temps = []
-        costs = []
-        n = 0
+        for run_idx in range(self.n_runs):
+            if time() - start_time > self.max_runtime:
+                break
 
-        # optimize using simulated annealing
-        temp = self.end_temperature + 10
-        delta_temp = float('inf')
-        delta_cost_total = 0
-        delta_entropy_total = 0
-        current_cost = self._cost(sequence)
+            sequence = tuple(initial_sequence)
 
-        while temp > self.end_temperature or delta_temp > self.delta_temp_stabilized_threshold:
-            # -----
-            temps.append(temp)
-            costs.append(current_cost)
-            n += 1
-            # -----
+            temps = []
+            costs = []
+            n = 0
 
-            new_sequence = self._mutate(sequence)
-            new_cost = self._cost(new_sequence)
-            delta_cost = new_cost - current_cost
-            prob = 1 if delta_cost < 0 else exp(-delta_cost / temp)
+            # optimize using simulated annealing
+            temp = self.start_temperature
+            delta_temp = float('inf')
+            delta_cost_total = 0
+            delta_entropy_total = 0
+            current_cost = self._cost(sequence)
 
-            if random() < prob:
-                sequence = new_sequence
-                current_cost = new_cost
-                delta_cost_total += delta_cost
-            if delta_cost > 0:
-                delta_entropy_total -= delta_cost / temp
-            if delta_cost_total >= 0 or delta_entropy_total == 0:
-                delta_temp = temp - self.start_temperature
-                temp = self.start_temperature
-            else:
-                new_temp = self.adjustment_factor * (delta_cost_total / delta_entropy_total)
-                delta_temp = temp - new_temp
-                temp = new_temp
+            while (temp > self.end_temperature or
+                   delta_temp > self.delta_temp_stabilized_threshold) \
+                    and time() - start_time < self.max_runtime:
+                # -----
+                temps.append(temp)
+                costs.append(current_cost)
+                n += 1
+                # -----
 
-        points = tuple(self.outposts[i] for i in sequence)
-        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
-        ax1.plot(tuple(x[0] for x in points), tuple(x[1] for x in points), 'bo-')
+                new_sequence = self._mutate(sequence, self.mutate_mode, self.weight_mode)
+                new_cost = self._cost(new_sequence)
+                delta_cost = new_cost - current_cost
+                prob = 1 if delta_cost < 0 else exp(-delta_cost / temp)
+
+                if random() < prob:
+                    sequence = new_sequence
+                    current_cost = new_cost
+                    delta_cost_total += delta_cost
+                if delta_cost > 0:
+                    delta_entropy_total -= delta_cost / temp
+                if delta_cost_total >= 0 or delta_entropy_total == 0:
+                    delta_temp = temp - self.start_temperature
+                    temp = self.start_temperature
+                else:
+                    new_temp = self.adjustment_factor * (delta_cost_total / delta_entropy_total)
+                    delta_temp = temp - new_temp
+                    temp = new_temp
+
+            all_temps.append(temps)
+            all_costs.append(costs)
+
+            if current_cost < best_cost:
+                best_cost = current_cost
+                best_sequence = sequence
+                all_best_temp_idx = run_idx
+                all_best_cost_idx = run_idx
+                best_n = n
+
+        points = tuple(self.outposts[i] for i in best_sequence)
+        fig, axs = plt.subplot_mosaic([["graph", "graph"], ["graph", "graph"], ["temp", "cost"]],
+                                      constrained_layout=True)
+        fig.suptitle(f"Simulated Annealing (n={best_n})")
+        axs['graph'].set_title("Graph")
+        axs['graph'].plot(tuple(x[0] for x in points), tuple(x[1] for x in points), 'bo-')
 
         def reduce_fn(acc, x):
             coords, last, last_angle = acc
@@ -272,14 +378,22 @@ class WKT:
                     coords.append(last)
             return coords, x, angle
         to_highlight = reduce(reduce_fn, points, ([], None, None))[0]
-        ax1.plot(tuple(x[0] for x in to_highlight), tuple(x[1] for x in to_highlight), 'ro')
+        axs['graph'].plot(tuple(x[0] for x in to_highlight), tuple(x[1] for x in to_highlight),
+                          'ro')
 
-        ax3.plot(temps, range(n))
-        ax4.plot(costs, range(n))
+        axs['temp'].set_title("Temperature")
+        for temps in all_temps:
+            axs['temp'].plot(temps, color='0.7', linestyle="dashed", zorder=0.5)
+        axs['temp'].plot(temps[all_best_temp_idx], color='blue', zorder=1)
+        axs['cost'].set_title("Cost")
+        for costs in all_costs:
+            axs['cost'].plot(temps, color='0.7', linestyle="dashed", zorder=0.5)
+        axs['cost'].plot(costs[all_best_cost_idx], color='blue', zorder=1)
 
         plt.show(block=True)
-        return tuple(self.outposts[i] for i in sequence)
+        return tuple(self.outposts[i] for i in best_sequence)
 
 
-wkt = WKT('beispieldaten/wenigerkrumm2.txt')
+wkt = WKT('beispieldaten/wenigerkrumm2.txt', 1000, 0.1, 0.95, 1, 2, 1, 5)
 solution = wkt.solve()
+print(solution)
