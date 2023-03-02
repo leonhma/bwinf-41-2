@@ -131,7 +131,7 @@ class WKT:
         ba = a - b
         bc = c - b
 
-        return np.arccos(np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc)))
+        return 180 - np.rad2deg(np.arccos(np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))))
 
     def _cost(self, sequence: Tuple[int]) -> float:
         """Return the fitness of a sequence. (lower is better)
@@ -360,7 +360,7 @@ class WKT:
         points = tuple(self.outposts[i] for i in best_sequence)
         fig, axs = plt.subplot_mosaic([["graph", "graph"], ["graph", "graph"], ["temp", "cost"]],
                                       constrained_layout=True)
-        fig.suptitle(f"Simulated Annealing (n={best_n})")
+        fig.suptitle(f"Thermodynamic Simulated Annealing (n={best_n})")
         axs['graph'].set_title("Graph")
         axs['graph'].plot(tuple(x[0] for x in points), tuple(x[1] for x in points), 'bo-')
 
