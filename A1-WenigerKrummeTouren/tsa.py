@@ -11,26 +11,12 @@ import matplotlib.pyplot as plt
 
 
 class WKT:
-    outposts: Tuple[Tuple[float, float]]
-    start_temperature: float
-    end_temperature: float
-    adjustment_factor: float
-    delta_temp_stabilized_threshold: float
-    mutate_mode: int
-    weight_mode: int
-    n_runs: int
     max_runtime: float
+    outposts: Tuple[Tuple[float, float]]
 
     def __init__(
             self,
             fp: str,
-            start_temperature: float = 10,
-            end_temperature: float = 100,
-            adjustment_factor: float = 0.95,
-            delta_temp_stabilized_threshold: float = 1,
-            mutate_mode: int = 0,
-            weight_mode: int = 0,
-            n_runs: int = 10,
             max_runtime: float = 30):
         """Initialize the WKT class.
 
@@ -66,13 +52,6 @@ class WKT:
             weight_mode is ignored if mutate_mode is 2 or 3.
 
         """
-        self.start_temperature = start_temperature
-        self.end_temperature = end_temperature
-        self.adjustment_factor = adjustment_factor
-        self.delta_temp_stabilized_threshold = delta_temp_stabilized_threshold
-        self.mutate_mode = mutate_mode
-        self.weight_mode = weight_mode
-        self.n_runs = n_runs
         self.max_runtime = max_runtime
 
         with open(path.join(
@@ -131,7 +110,12 @@ class WKT:
         ba = a - b
         bc = c - b
 
-        return 180 - np.rad2deg(np.arccos(np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))))
+        return 180 - np.rad2deg(np.arccos(np.dot(ba, bc) /
+                                          (np.linalg.norm(ba) * np.linalg.norm(bc))))
+
+    def to_outposts(self, sequence: Tuple[int, ...]) -> Tuple[Tuple[int, int]]:
+        print(f'converted sequence {sequence} to outposts')
+        return tuple(self.outposts[i] for i in sequence)
 
     def _cost(self, sequence: Tuple[int]) -> float:
         """Return the fitness of a sequence. (lower is better)
@@ -151,13 +135,19 @@ class WKT:
         for i in range(1, len(sequence)):
             # angle calculation
             if i >= 2:
-                if abs(self._angle(sequence[i - 2], sequence[i - 1], sequence[i])) > 90:
-                    weight += 1000
+                if self._angle(sequence[i - 2], sequence[i - 1], sequence[i]) > 90:
+                    weight += 700 * len(sequence)
 
             # weight calculation
             weight += self._distance(sequence[i - 1], sequence[i])
 
         return weight
+
+    def _contains_illegal_turn(self, sequence: Tuple[int, ...]) -> bool:
+        for i in range(2, len(sequence)):
+            if self._angle(sequence[i - 2], sequence[i - 1], sequence[i]) > 90:
+                return True
+        return False
 
     def _mutability(self, sequence: Tuple[int, ...]) -> Tuple[float, ...]:
         """Return the mutation probability of each point in the sequence.
@@ -178,7 +168,7 @@ class WKT:
         for i in range(1, len(sequence)):
             # angle calculation
             if i >= 2:
-                if abs(self._angle(sequence[i - 2], sequence[i - 1], sequence[i])) > 90:
+                if self._angle(sequence[i - 2], sequence[i - 1], sequence[i]) > 90:
                     illegal_turn_indices.append(i - 1)
 
             # weight calculation
@@ -202,7 +192,6 @@ class WKT:
 
         return tuple(map(lambda x: x / (sum(mutability)), mutability))
 
-    # TODO: test swapping vs removing and inserting vs random segment flips
     def _mutate(self, sequence: Tuple[int, ...],
                 mutate_mode: int,
                 weight_mode: int) -> Tuple[int, ...]:
@@ -270,15 +259,7 @@ class WKT:
             new_sequence[s1:s2] + new_sequence[s3:]
         return tuple(new_sequence)
 
-    def solve(self) -> Tuple[Tuple[float, float]]:
-        """Return the optimized sequence.
-
-        Returns
-        -------
-        Tuple[Tuple[float, float]]
-            The sequence of outposts to visit.
-        """
-
+    def create_initial_biclosest(self) -> Tuple[int, ...]:
         # create initial sequence using greedy algorithm
         to_add = [i for i in range(len(self.outposts)) if i != 0]
         initial_sequence = [0]
@@ -293,108 +274,118 @@ class WKT:
             initial_sequence.insert(next_[2], next_[0])
             to_add.remove(next_[0])
 
+        return tuple(initial_sequence)
+
+    def optimize(self,
+                 start_temperature: float,
+                 end_temperature: float,
+                 adjustment_factor: float,
+                 delta_temp_stabilized_threshold: float,
+                 mutate_mode: int,
+                 weight_mode: int,
+                 sequence: Tuple[int, ...] = ()) -> Tuple[Tuple[float, float]]:
+        """Return the optimized sequence.
+
+        Returns
+        -------
+        Tuple[Tuple[float, float]]
+            The sequence of outposts to visit.
+        """
         best_sequence = None
         best_cost = float('inf')
-        all_temps = []
-        all_best_temp_idx = None
-        all_costs = []
-        all_best_cost_idx = None
-        best_n = None
         start_time = time()
 
-        for run_idx in range(self.n_runs):
-            if time() - start_time > self.max_runtime:
-                break
+        # optimize using simulated annealing
+        temp = start_temperature
+        delta_temp = float('inf')
+        delta_cost_total = 0
+        delta_entropy_total = 0
+        current_cost = self._cost(sequence)
 
-            sequence = tuple(initial_sequence)
+        while (temp > end_temperature or
+               delta_temp > delta_temp_stabilized_threshold) \
+                and time() - start_time < self.max_runtime:
+            new_sequence = self._mutate(sequence, mutate_mode, weight_mode)
+            new_cost = self._cost(new_sequence)
+            delta_cost = new_cost - current_cost
+            prob = 1 if delta_cost < 0 else np.exp(-delta_cost / temp)
+            if random() < prob:
+                sequence = new_sequence
+                current_cost = new_cost
+                delta_cost_total += delta_cost
+            if delta_cost > 0:
+                delta_entropy_total -= delta_cost / temp
+            if delta_cost_total >= 0 or delta_entropy_total == 0:
+                delta_temp = temp - start_temperature
+                temp = start_temperature
+            else:
+                new_temp = adjustment_factor * (delta_cost_total / delta_entropy_total)
+                delta_temp = temp - new_temp
+                temp = new_temp
+        if current_cost < best_cost:
+            best_cost = current_cost
+            best_sequence = sequence
 
-            temps = []
-            costs = []
-            n = 0
-
-            # optimize using simulated annealing
-            temp = self.start_temperature
-            delta_temp = float('inf')
-            delta_cost_total = 0
-            delta_entropy_total = 0
-            current_cost = self._cost(sequence)
-
-            while (temp > self.end_temperature or
-                   delta_temp > self.delta_temp_stabilized_threshold) \
-                    and time() - start_time < self.max_runtime:
-                # -----
-                temps.append(temp)
-                costs.append(current_cost)
-                n += 1
-                # -----
-
-                new_sequence = self._mutate(sequence, self.mutate_mode, self.weight_mode)
-                new_cost = self._cost(new_sequence)
-                delta_cost = new_cost - current_cost
-                prob = 1 if delta_cost < 0 else np.exp(-delta_cost / temp)
-
-                if random() < prob:
-                    sequence = new_sequence
-                    current_cost = new_cost
-                    delta_cost_total += delta_cost
-                if delta_cost > 0:
-                    delta_entropy_total -= delta_cost / temp
-                if delta_cost_total >= 0 or delta_entropy_total == 0:
-                    delta_temp = temp - self.start_temperature
-                    temp = self.start_temperature
-                else:
-                    new_temp = self.adjustment_factor * (delta_cost_total / delta_entropy_total)
-                    delta_temp = temp - new_temp
-                    temp = new_temp
-
-            all_temps.append(temps)
-            all_costs.append(costs)
-
-            if current_cost < best_cost:
-                best_cost = current_cost
-                best_sequence = sequence
-                all_best_temp_idx = run_idx
-                all_best_cost_idx = run_idx
-                best_n = n
-
-        points = tuple(self.outposts[i] for i in best_sequence)
-        fig, axs = plt.subplot_mosaic([["graph", "graph"], ["graph", "graph"], ["temp", "cost"]],
-                                      constrained_layout=True)
-        fig.suptitle(f"Thermodynamic Simulated Annealing (n={best_n})")
-        axs['graph'].set_title("Graph")
-        axs['graph'].plot(tuple(x[0] for x in points), tuple(x[1] for x in points), 'bo-')
-
-        def reduce_fn(acc, x):
-            coords, last, llast = acc
-            if last and llast:
-                if abs(self._angle(llast, last, x)) > 90:
-                    coords.append(last)
-
-            return coords, x, last
-        to_highlight = [self.outposts[i] for i in reduce(reduce_fn, best_sequence, ([], None, None))[0]]
-        axs['graph'].plot(tuple(x[0] for x in to_highlight), tuple(x[1] for x in to_highlight),
-                          'ro')
-
-        axs['temp'].set_title("Temperature")
-        for temps in all_temps:
-            axs['temp'].plot(temps, '--', color='0.7', zorder=0.5)
-        axs['temp'].plot(all_temps[all_best_temp_idx], '-', color='blue', zorder=1)
-        axs['cost'].set_title("Cost")
-        for costs in all_costs:
-            axs['cost'].plot(costs, '--', color='0.7', zorder=0.5)
-        axs['cost'].plot(all_costs[all_best_cost_idx], '-', color='blue', zorder=1)
-
-        plt.show(block=True)
-        return tuple(self.outposts[i] for i in best_sequence)
+        return best_sequence
 
 
-wkt = WKT('beispieldaten/wenigerkrumm4.txt',
-          start_temperature=100,
-          end_temperature=1,
-          adjustment_factor=0.95,
-          delta_temp_stabilized_threshold=0.5,
-          mutate_mode=1,
-          weight_mode=0,
-          n_runs=5,
-          max_runtime=30)
-solution = wkt.solve()
+def run(example: int):
+    wkt = WKT(f'beispieldaten/wenigerkrumm{example}.txt',
+              max_runtime=30)
+
+    initial_sequence = wkt.create_initial_biclosest()
+    print(f'Initial sequence cost: {wkt._cost(initial_sequence)}')
+
+    solution = None
+    start_time = time()
+
+    while time() - start_time < 30:
+        if solution is not None and not wkt._contains_illegal_turn(solution):
+            break
+        flip_optimized = wkt.optimize(100, 1, 1, 0.1, 2, 1, initial_sequence)
+        print(f'Flip optimized sequence cost: {wkt._cost(flip_optimized)}')
+        solution = flip_optimized
+
+        # solution = wkt.optimize(1, 1, 0.95, 1, 1, 0, initial_sequence)
+        # print(f'Swap optimized sequence cost: {wkt._cost(solution)}')
+    else:
+        print('No solution found')
+        return
+    return wkt.to_outposts(solution)
+
+# points = tuple(self.outposts[i] for i in best_sequence)
+# fig, axs = plt.subplot_mosaic([["graph", "graph"], ["graph", "graph"], ["temp", "cost"]],
+#                               constrained_layout=True)
+# fig.suptitle(f"Thermodynamic Simulated Annealing (n={best_n})")
+# axs['graph'].set_title("Graph")
+# axs['graph'].plot(tuple(x[0] for x in points), tuple(x[1] for x in points), 'bo-')
+# def reduce_fn(acc, x):
+#     coords, last, llast = acc
+#     if last and llast:
+#         if abs(self._angle(llast, last, x)) > 90:
+#             coords.append(last)
+#     return coords, x, last
+# to_highlight = [self.outposts[i] for i in reduce(reduce_fn, best_sequence, ([], None, None))[0]]
+# axs['graph'].plot(tuple(x[0] for x in to_highlight), tuple(x[1] for x in to_highlight),
+#                   'ro')
+# axs['temp'].set_title("Temperature")
+# for temps in all_temps:
+#     axs['temp'].plot(temps, '--', color='0.7', zorder=0.5)
+# axs['temp'].plot(all_temps[all_best_temp_idx], '-', color='blue', zorder=1)
+# axs['cost'].set_title("Cost")
+# for costs in all_costs:
+#     axs['cost'].plot(costs, '--', color='0.7', zorder=0.5)
+# axs['cost'].plot(all_costs[all_best_cost_idx], '-', color='blue', zorder=1)
+# plt.show(block=True)
+
+
+while True:
+    try:
+        solution = run(input('Nummer des Beispiels: > '))
+        if solution is not None:
+            print(solution)
+    except Exception as e:
+        print(e)
+    except KeyboardInterrupt:
+        print('Stopped')
+        break
