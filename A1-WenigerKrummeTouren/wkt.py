@@ -72,6 +72,7 @@ class WKT:
         current_outpost = genome[0]  # arbitrary starting point
         current_angle, longest_edge_length, longest_edge_idx, illegal_turn_idx = [
             None] * 4
+        constraints_met = True
 
         for i in range(len(self.outposts) + 1):
             angle = self._angle(
@@ -80,12 +81,10 @@ class WKT:
             if current_angle is not None:
                 turn = (current_angle - angle + 180) % 360 - 180
                 if abs(turn) > 90:
-                    # TODO allow second illegal turn
                     if illegal_turn_idx is None:
                         illegal_turn_idx = i
                     else:
-                        print(f'too many illegal turns {abs(turn)} at {i=}')
-                        return (), float('inf')
+                        constraints_met = False
             current_angle = angle
 
             length = self.distance_cache[current_outpost][
