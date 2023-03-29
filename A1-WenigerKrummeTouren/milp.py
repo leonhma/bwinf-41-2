@@ -75,28 +75,38 @@ def main(points: List[Tuple[float, float]]):
         for j in range(len(data['points'])):
             if i == j:
                 continue
-            x[(i, j)] = solver.BoolVar(f'x_{i}_{j}')
+            x[i, j] = solver.BoolVar(f'x_{i}_{j}')
+
+    for i in range(len(data['points'])):
+        x['t', i] = solver.IntVar(0, len(data['points']) - 1, f't_{i}')
     print(f'Created {solver.NumVariables()} variables')
 
     # create the constraints
 
     # one selection per position
+    sums = []
     for i in range(len(data['points'])):
-        solver.Add(solver.Sum([x[(i, j)] for j in range(len(data['points'])) if i != j]) <= 1)
+        sum_ = solver.Sum([x[i, j] for j in range(len(data['points'])) if i != j])
+        solver.Add(sum_ <= 1)
+        sums.append(sum_)
+    solver.Add(solver.Sum(sums) == len(data['points']) - 1)
 
-    # one end index TODO: check if this is correct
-    solver.Add(solver.Sum([x[(i, j)] for i in range(len(data['points'])) for j in range(len(data['points'])) if i != j]) == len(data['points']) - 1)
-
-    # a point can only be selected (up to) once 
+    # a point can only be selected (up to) once
     for j in range(len(data['points'])):
-        solver.Add(solver.Sum([x[(i, j)] for i in range(len(data['points'])) if i != j]) <= 1)
+        solver.Add(solver.Sum([x[i, j] for i in range(len(data['points'])) if i != j]) <= 1)
 
     # no two-way connections
     for i in range(len(data['points'])):
         for j in range(len(data['points'])):
             if i == j:
                 continue
-            solver.Add(x[(i, j)] + x[(j, i)] <= 1)
+            solver.Add(x[i, j] + x[(j, i)] <= 1)
+
+    # subtour elimination
+    for i in range(len(data['points'])):
+        for j in range(len(data['points'])):
+            if i != j and (i != 0 and j != 0):
+                solver.Add(x['t', j] >= x['t', i] + 1 - (2 * len(data['points'])) * (1 - x[i, j]))
 
     # create the turn constraint
 
@@ -106,7 +116,7 @@ def main(points: List[Tuple[float, float]]):
         for j in range(len(data['points'])):
             if i == j:
                 continue
-            objective.SetCoefficient(x[(i, j)], _distance(data['points'][i], data['points'][j]))
+            objective.SetCoefficient(x[i, j], _distance(data['points'][i], data['points'][j]))
     objective.SetMinimization()
 
     status = solver.Solve()
@@ -123,7 +133,7 @@ def main(points: List[Tuple[float, float]]):
             G.add_node(i, pos=data['points'][i])
         for i in range(len(data['points'])):
             for j in range(len(data['points'])):
-                if i != j and x[(i, j)].solution_value() > 0:
+                if i != j and x[i, j].solution_value() > 0:
                     G.add_edge(i, j)
 
         pos = nx.get_node_attributes(G, 'pos')
