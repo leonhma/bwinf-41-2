@@ -222,15 +222,14 @@ class WKT:
             The mutated sequence.
         """
         probs = self._mutability(sequence) if weight_mode else tuple(1 for _ in sequence)
-        match mutate_mode:
-            case 0:
-                return self._mutate_remove_insert(sequence, probs)
-            case 1:
-                return self._mutate_swap(sequence, probs)
-            case 2:
-                return self._mutate_flip(sequence)
-            case 3:
-                return self._mutate_move(sequence)
+        if mutate_mode == 0:
+            return self._mutate_remove_insert(sequence, probs)
+        elif mutate_mode == 1:
+            return self._mutate_swap(sequence, probs)
+        elif mutate_mode == 2:
+            return self._mutate_flip(sequence)
+        elif mutate_mode == 3:
+            return self._mutate_move(sequence)
 
     def _mutate_remove_insert(self, sequence: Tuple[int, ...],
                               probs: Tuple[float, ...]) -> Tuple[int, ...]:
@@ -291,8 +290,6 @@ class WKT:
         Tuple[Tuple[float, float]]
             The sequence of outposts to visit.
         """
-        best_sequence = None
-        best_cost = float('inf')
         start_time = time()
 
         temps = []
@@ -303,6 +300,9 @@ class WKT:
         delta_cost_total = 0
         delta_entropy_total = 0
         current_cost = self._cost(sequence)
+
+        best_sequence = sequence
+        best_cost = current_cost
 
         while (temp > end_temperature or
                delta_temp > delta_temp_stabilized_threshold) \
@@ -323,6 +323,9 @@ class WKT:
                 sequence = new_sequence
                 current_cost = new_cost
                 delta_cost_total += delta_cost
+            if new_cost < best_cost and not self._contains_illegal_turn(new_sequence):
+                best_cost = new_cost
+                best_sequence = sequence
             if delta_cost > 0:
                 delta_entropy_total -= delta_cost / temp
             if delta_cost_total >= 0 or delta_entropy_total == 0:
@@ -350,15 +353,16 @@ def run(example: int):
     start_time = time()
 
     while time() - start_time < 30:
-        if solution is not None and not wkt._contains_illegal_turn(solution):
+        if solution is not None:
             break
         flip_optimized = wkt.optimize(1000, 1, 1, 0.1, 2, 1, initial_sequence)
         print(f'Flip optimized sequence cost: {wkt._cost(flip_optimized)}')
-        solution = flip_optimized
+        if not wkt._contains_illegal_turn(flip_optimized):
+            solution = flip_optimized
 
         # solution = wkt.optimize(1, 1, 0.95, 1, 1, 0, initial_sequence)
         # print(f'Swap optimized sequence cost: {wkt._cost(solution)}')
-    else:
+    if not solution:
         print('No solution found')
         return
     return wkt.to_outposts(solution)
@@ -393,9 +397,7 @@ while True:
     try:
         solution = run(input('Nummer des Beispiels: > '))
         if solution is not None:
-            print(solution)
-    except Exception as e:
-        print(e)
+            print(len(solution))
     except KeyboardInterrupt:
         print('Stopped')
         break
