@@ -295,6 +295,8 @@ class WKT:
         best_cost = float('inf')
         start_time = time()
 
+        temps = []
+        costs = []
         # optimize using simulated annealing
         temp = start_temperature
         delta_temp = float('inf')
@@ -305,6 +307,14 @@ class WKT:
         while (temp > end_temperature or
                delta_temp > delta_temp_stabilized_threshold) \
                 and time() - start_time < self.max_runtime:
+            temps.append(temp)
+            costs.append(current_cost)
+            plt.clf()
+            plt.plot(temps, 'r')
+            plt.text(len(temps), temps[-1], f'{temps[-1]:.2f}', color='r')
+            plt.plot(costs, 'b')
+            plt.text(len(costs), costs[-1], f'{costs[-1]:.2f}', color='b')
+            plt.pause(0.03)
             new_sequence = self._mutate(sequence, mutate_mode, weight_mode)
             new_cost = self._cost(new_sequence)
             delta_cost = new_cost - current_cost
@@ -342,7 +352,7 @@ def run(example: int):
     while time() - start_time < 30:
         if solution is not None and not wkt._contains_illegal_turn(solution):
             break
-        flip_optimized = wkt.optimize(100, 1, 1, 0.1, 2, 1, initial_sequence)
+        flip_optimized = wkt.optimize(1000, 1, 1, 0.1, 2, 1, initial_sequence)
         print(f'Flip optimized sequence cost: {wkt._cost(flip_optimized)}')
         solution = flip_optimized
 
