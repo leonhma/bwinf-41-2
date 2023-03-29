@@ -1,9 +1,11 @@
 from functools import lru_cache
-from typing import Dict, Iterable, List, Tuple
-import numpy as np
+import itertools
+from typing import List, Tuple
 from ortools.linear_solver import pywraplp
 import networkx as nx
 import matplotlib.pyplot as plt
+import operator
+import math
 
 
 @lru_cache(maxsize=None)    # cache the results of this function for speeed
@@ -25,6 +27,18 @@ def _distance(p1: Tuple[int, int], p2: Tuple[int, int]) -> float:
         (p1[1] - p2[1]) ** 2) ** 0.5
 
 
+def dot(a, b):
+    return sum(map(operator.mul, a, b))
+
+
+def sub(a, b):
+    return tuple(map(operator.sub, a, b))
+
+
+def norm(a):
+    return math.sqrt(dot(a, a))
+
+
 @lru_cache(maxsize=None)
 def _angle(p1: Tuple[int, int], p2: Tuple[int, int], p3: Tuple[int, int]) -> float:
     """Return the closest-to-zero angle of the flight line to the x-axis. ([-180, 180])
@@ -44,24 +58,12 @@ def _angle(p1: Tuple[int, int], p2: Tuple[int, int], p3: Tuple[int, int]) -> flo
     float
         The angle between the two points.
     """
-    a = np.array(p1)
-    b = np.array(p2)
-    c = np.array(p3)
-    ba = a - b
-    bc = c - b
-    return 180 - np.rad2deg(np.arccos(np.dot(ba, bc) /
-                                      (np.linalg.norm(ba) * np.linalg.norm(bc))))
-
-
-def get_data(points: Iterable[Tuple[float, float]]) -> Dict:
-    data = {}
-    data['max_turn_angle'] = 90
-    data['points'] = tuple(points)
-    return data
+    ba = sub(p1, p2)
+    bc = sub(p3, p2)
+    return 180 - math.degrees(math.acos(dot(ba, bc) / (norm(ba) * norm(bc))))
 
 
 def main(points: List[Tuple[float, float]]):
-    data = get_data(points)
 
     # create the solver
     solver = pywraplp.Solver.CreateSolver('CP_SAT')
@@ -71,52 +73,53 @@ def main(points: List[Tuple[float, float]]):
 
     # create the variables
     x = {}
-    for i in range(len(data['points'])):
-        for j in range(len(data['points'])):
+    for i in range(len(points)):
+        for j in range(len(points)):
             if i == j:
                 continue
             x[i, j] = solver.BoolVar(f'x_{i}_{j}')
 
-    for i in range(len(data['points'])):
-        x['t', i] = solver.IntVar(0, len(data['points']) - 1, f't_{i}')
+    for i in range(len(points)):
+        x['t', i] = solver.IntVar(0, len(points) - 1, f't_{i}')
     print(f'Created {solver.NumVariables()} variables')
 
     # create the constraints
 
     # one selection per position
     sums = []
-    for i in range(len(data['points'])):
-        sum_ = solver.Sum([x[i, j] for j in range(len(data['points'])) if i != j])
+    for i in range(len(points)):
+        sum_ = solver.Sum([x[i, j] for j in range(len(points)) if i != j])
         solver.Add(sum_ <= 1)
         sums.append(sum_)
-    solver.Add(solver.Sum(sums) == len(data['points']) - 1)
+    solver.Add(solver.Sum(sums) == len(points) - 1)
 
     # a point can only be selected (up to) once
-    for j in range(len(data['points'])):
-        solver.Add(solver.Sum([x[i, j] for i in range(len(data['points'])) if i != j]) <= 1)
+    for j in range(len(points)):
+        solver.Add(solver.Sum([x[i, j] for i in range(len(points)) if i != j]) <= 1)
 
     # no two-way connections
-    for i in range(len(data['points'])):
-        for j in range(len(data['points'])):
-            if i == j:
-                continue
-            solver.Add(x[i, j] + x[(j, i)] <= 1)
+    for i, j in itertools.permutations(range(len(points)), 2):
+        if i == j:
+            continue
+        solver.Add(x[i, j] + x[(j, i)] <= 1)
 
     # subtour elimination
-    for i in range(len(data['points'])):
-        for j in range(len(data['points'])):
-            if i != j and (i != 0 and j != 0):
-                solver.Add(x['t', j] >= x['t', i] + 1 - (2 * len(data['points'])) * (1 - x[i, j]))
+    for i, j in itertools.permutations(range(len(points)), 2):
+        if i != j and (i != 0 and j != 0):
+            solver.Add(x['t', j] >= x['t', i] + 1 - (2 * len(points)) * (1 - x[i, j]))
 
     # create the turn constraint
+    for i, j, k in itertools.permutations(range(len(points)), 3):
+        if i != j and j != k and i != k:
+            solver.Add(_angle(points[i], points[j], points[k]) >= 90).OnlyEnforceIf(x[i, j]).OnlyEnforceIf(x[j, k]) # TODO cp_sat
 
     # create the objective
     objective = solver.Objective()
-    for i in range(len(data['points'])):        # last row doesnt have any weight
-        for j in range(len(data['points'])):
+    for i in range(len(points)):        # last row doesnt have any weight
+        for j in range(len(points)):
             if i == j:
                 continue
-            objective.SetCoefficient(x[i, j], _distance(data['points'][i], data['points'][j]))
+            objective.SetCoefficient(x[i, j], _distance(points[i], points[j]))
     objective.SetMinimization()
 
     status = solver.Solve()
@@ -129,10 +132,10 @@ def main(points: List[Tuple[float, float]]):
         print('Problem solved in %d branch-and-bound nodes' % solver.nodes())
 
         G = nx.Graph()
-        for i in range(len(data['points'])):
-            G.add_node(i, pos=data['points'][i])
-        for i in range(len(data['points'])):
-            for j in range(len(data['points'])):
+        for i in range(len(points)):
+            G.add_node(i, pos=points[i])
+        for i in range(len(points)):
+            for j in range(len(points)):
                 if i != j and x[i, j].solution_value() > 0:
                     G.add_edge(i, j)
 
