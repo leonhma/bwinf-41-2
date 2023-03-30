@@ -1,11 +1,11 @@
 from functools import lru_cache
 import itertools
+import math
+import operator
 from typing import List, Tuple
-from ortools.linear_solver import pywraplp
+from ortools.sat.python import cp_model
 import networkx as nx
 import matplotlib.pyplot as plt
-import operator
-import math
 
 
 @lru_cache(maxsize=None)    # cache the results of this function for speeed
@@ -64,69 +64,66 @@ def _angle(p1: Tuple[int, int], p2: Tuple[int, int], p3: Tuple[int, int]) -> flo
 
 
 def main(points: List[Tuple[float, float]]):
+    model = cp_model.CpModel()
 
-    # create the solver
-    solver = pywraplp.Solver.CreateSolver('CP_SAT')
-    if not solver:
-        print('Could not create solver')
-        return
-
-    # create the variables
     x = {}
     for i in range(len(points)):
         for j in range(len(points)):
             if i == j:
                 continue
-            x[i, j] = solver.BoolVar(f'x_{i}_{j}')
+            x[i, j] = model.NewBoolVar(f'x_{i}_{j}')
 
     for i in range(len(points)):
-        x['t', i] = solver.IntVar(0, len(points) - 1, f't_{i}')
-    print(f'Created {solver.NumVariables()} variables')
+        x['t', i] = model.NewIntVar(0, len(points) - 1, f't_{i}')
 
     # create the constraints
 
     # one selection per position
     sums = []
     for i in range(len(points)):
-        sum_ = solver.Sum([x[i, j] for j in range(len(points)) if i != j])
-        solver.Add(sum_ <= 1)
+        sum_ = sum([x[i, j] for j in range(len(points)) if i != j])
+        model.Add(sum_ <= 1)
         sums.append(sum_)
-    solver.Add(solver.Sum(sums) == len(points) - 1)
+    model.Add(sum(sums) == len(points) - 1)
 
     # a point can only be selected (up to) once
     for j in range(len(points)):
-        solver.Add(solver.Sum([x[i, j] for i in range(len(points)) if i != j]) <= 1)
+        model.Add(sum([x[i, j] for i in range(len(points)) if i != j]) <= 1)
 
     # no two-way connections
     for i, j in itertools.permutations(range(len(points)), 2):
         if i == j:
             continue
-        solver.Add(x[i, j] + x[(j, i)] <= 1)
+        model.Add(x[i, j] + x[(j, i)] <= 1)
 
     # subtour elimination
     for i, j in itertools.permutations(range(len(points)), 2):
         if i != j and (i != 0 and j != 0):
-            solver.Add(x['t', j] >= x['t', i] + 1 - (2 * len(points)) * (1 - x[i, j]))
+            model.Add(x['t', j] >= x['t', i] + 1 - (2 * len(points)) * (1 - x[i, j]))
 
-    # # create the turn constraint
+    # create the turn constraint
+    print('creating angle contraints')
     for i, j, k in itertools.permutations(range(len(points)), 3):
         if i != j and j != k and i != k:
-            solver.Add(_angle(points[i], points[j], points[k]) >= (90 * x[i, j] * x[j, k]))
+            model.Add(_angle(points[i], points[j], points[k]) >= 90) \
+                .OnlyEnforceIf(x[i, j]).OnlyEnforceIf(x[j, k])
 
-    # create the objective
-    objective = solver.Objective()
-    for i in range(len(points)):        # last row doesnt have any weight
-        for j in range(len(points)):
-            if i == j:
-                continue
-            objective.SetCoefficient(x[i, j], _distance(points[i], points[j]))
-    objective.SetMinimization()
+    def cost():
+        weight = 0
+        for i, j in itertools.permutations(range(len(points)), 2):
+            if i != j:
+                if x[i, j]:
+                    weight += _distance(points[i], points[j])
+        return weight
 
-    status = solver.Solve()
+    model.Minimize(cost)
 
-    if status == pywraplp.Solver.OPTIMAL or status == pywraplp.Solver.FEASIBLE:
+    solver = cp_model.CpSolver()
+    status = solver.Solve(model)
+
+    if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
         print('Objective value =', solver.Objective().Value())
-        if (status == pywraplp.Solver.FEASIBLE):
+        if (status == cp_model.FEASIBLE):
             print('A potentially suboptimal solution.')
         print()
         print('Problem solved in %f milliseconds' % solver.wall_time())
@@ -145,9 +142,6 @@ def main(points: List[Tuple[float, float]]):
         nx.draw(G, pos, with_labels=True)
         plt.gca().set_aspect('equal')
         plt.show()
-    else:
-        print('The problem does not have an optimal solution.')
-
 
 if __name__ == '__main__':
     fname = f'beispieldaten/wenigerkrumm{input("nummer? ")}.txt'
