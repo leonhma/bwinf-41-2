@@ -83,35 +83,15 @@ def main(points: List[Tuple[float, float]]):
         x['t', i] = solver.IntVar(0, len(points) - 1, f't_{i}')
     print(f'Created {solver.NumVariables()} variables')
 
-    # create the constraints
-
-    # one selection per position
-    sums = []
-    for i in range(len(points)):
-        sum_ = solver.Sum([x[i, j] for j in range(len(points)) if i != j])
-        solver.Add(sum_ <= 1)
-        sums.append(sum_)
-    solver.Add(solver.Sum(sums) == len(points) - 1)
-
-    # a point can only be selected (up to) once
-    for j in range(len(points)):
-        solver.Add(solver.Sum([x[i, j] for i in range(len(points)) if i != j]) <= 1)
-
-    # no two-way connections
-    for i, j in itertools.permutations(range(len(points)), 2):
-        if i == j:
-            continue
-        solver.Add(x[i, j] + x[(j, i)] <= 1)
-
     # subtour elimination
     for i, j in itertools.permutations(range(len(points)), 2):
         if i != j and (i != 0 and j != 0):
-            solver.Add(x['t', j] >= x['t', i] + 1 - (2 * len(points)) * (1 - x[i, j]))
+            solver.Add(x['t', j] > (x['t', i] - (len(points) - 1) * (1 - x[i, j])))
 
-    # # create the turn constraint
+    # create the turn constraint
     for i, j, k in itertools.permutations(range(len(points)), 3):
         if i != j and j != k and i != k:
-            solver.Add(_angle(points[i], points[j], points[k]) >= (90 * x[i, j] * x[j, k]))
+            solver.Add(_angle(points[i], points[j], points[k]) <= 90 + 90 * (1 - x[i, j]) * (1 - x[j, k]))
 
     # create the objective
     objective = solver.Objective()

@@ -105,7 +105,7 @@ def main(points: List[Tuple[float, float]]):
     print('creating angle contraints')
     for i, j, k in itertools.permutations(range(len(points)), 3):
         if i != j and j != k and i != k:
-            model.Add(_angle(points[i], points[j], points[k]) >= 90) \
+            model.Add(_angle(points[i], points[j], points[k]) <= 90) \
                 .OnlyEnforceIf(x[i, j]).OnlyEnforceIf(x[j, k])
 
     def cost():
@@ -116,7 +116,7 @@ def main(points: List[Tuple[float, float]]):
                     weight += _distance(points[i], points[j])
         return weight
 
-    model.Minimize(cost)
+    model.Minimize(cp_model.LinearExpr.Sum([x[i, j] * _distance(points[i], points[j]) for i, j in itertools.permutations(range(len(points)), 2) if i != j]))
 
     solver = cp_model.CpSolver()
     status = solver.Solve(model)
