@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 
 @lru_cache(maxsize=None)
-def _distance(p1: Tuple[int, int], p2: Tuple[int, int]) -> float:
+def distance(p1: Tuple[int, int], p2: Tuple[int, int]) -> float:
     return (
         (p1[0] - p2[0]) ** 2 +
         (p1[1] - p2[1]) ** 2) ** 0.5
@@ -29,7 +29,7 @@ def norm(a):
 
 
 @lru_cache(maxsize=None)
-def _angle(p1: Tuple[int, int], p2: Tuple[int, int], p3: Tuple[int, int]) -> float:
+def angle(p1: Tuple[int, int], p2: Tuple[int, int], p3: Tuple[int, int]) -> float:
     ba = sub(p1, p2)
     bc = sub(p3, p2)
     cos = max(min(dot(ba, bc) / (norm(ba) * norm(bc)), 1), -1)  # clamp to domain of acos
@@ -40,8 +40,9 @@ def main(points: List[Tuple[float, float]]):
     model = cp_model.CpModel()
 
     # create the variables
-    nums = [model.NewIntVar(0, len(points) - 1, f'num_{i}') for i in range(len(points))]
-    start = model.NewIntVar(0, len(points) - 1, 'start')
+    nums = [model.NewIntVarFromDomain(cp_model.Domain.FromIntervals([[-1, i - 1], [i + 1, len(points) - 1]]), f'num_{i}') for i in range(len(points))]
+
+    # TODO remove self assign
 
     # create the constraints
     model.AddAllDifferent(*nums)
@@ -50,13 +51,15 @@ def main(points: List[Tuple[float, float]]):
     print('creating angle contraints')
     for i, j, k in sliding_window(map(lambda x: x % len(points), range(len(points) + 2)), 3):
         model \
-            .Add(_angle(points[nums[i]], points[nums[j]], points[nums[k]]) <= 90) \
-            .OnlyEnforceIf(nums[j] != start) \
-            .OnlyEnforceIf(nums[k] != start)
+            .Add(angle(points[i], points[j], points[k]) <= 90) \
+            .OnlyEnforceIf(nums[i] == j) \
+            .OnlyEnforceIf(nums[j] == k)
 
-    model.Minimize(sum(_distance(points[nums[i]], points[nums[(i + 1) % len(points)]])
-                       for i in range(len(points)))
-                   - _distance(points[(start - 1) % len(points)], points[start]))
+    model.Minimize(
+        cp_model.LinearExpr.WeightedSum(
+            tuple(distance(points[i], points[j]) for i, j in itertools.permutations(range(len(points), 2))),
+            tuple(distance(i, j) if -1 not in (i, j) else 0 for i, j in itertools.permutations(range(len(points), 2)))
+        ))
 
     solver = cp_model.CpSolver()
     status = solver.Solve(model)

@@ -1,14 +1,15 @@
-from functools import lru_cache
+import functools
 import itertools
 import math
 import operator
 from typing import List, Tuple
-from ortools.linear_solver import pywraplp
-import networkx as nx
+
 import matplotlib.pyplot as plt
+import networkx as nx
+from ortools.sat.python import cp_model
 
 
-@lru_cache(maxsize=None)    # cache the results of this function for speeed
+@functools.lru_cache(maxsize=None)    # cache the results of this function for speeed
 def distance(p1: Tuple[int, int], p2: Tuple[int, int]) -> float:
     return (
         (p1[0] - p2[0]) ** 2 +
@@ -34,73 +35,63 @@ def angle(p1: Tuple[int, int], p2: Tuple[int, int], p3: Tuple[int, int]) -> floa
     return 180 - math.degrees(math.acos(cos))
 
 
-# pylama:ignore=C901
 def main(points: List[Tuple[float, float]]):
-
-    # create the solver
-    solver = pywraplp.Solver.CreateSolver('CP_SAT')
-    if not solver:
-        print('Could not create solver')
-        return
-    solver.SetTimeLimit(120000)
+    model = cp_model.CpModel()
 
     # create variables
     # create 3d variable matrix where angle doesn't exceed 90°
     x = {}
     for j in range(len(points)):
         for i, k in itertools.permutations(range(-1, len(points)), 2):
-            if (i != k and j not in (i, k) and
+            if ((i != j and j != k and k != i) and
                     ((i == -1 or k == -1) or angle(points[i], points[j], points[k]) <= 90)):
-                x[i, j, k] = solver.BoolVar(f'x_{i}_{j}_{k}')
-    mlz = {i: solver.IntVar(0, len(points) - 1, f'mlz_{i}') for i in range(len(points))}  # added -1 here 
-    print(f'Number of variables: {solver.NumVariables()}')
+                x[i, j, k] = model.NewBoolVar(f'x_{i}_{j}_{k}')
+    mlz = {i: model.NewIntVar(0, len(points) - 1, f'mlz_{i}') for i in range(len(points))}
+    print(f'Number of variables: {len(x)}/{len(mlz)}')
 
     # create the constraints
     # no subtours are created
     for i, j, k in x:
         if i != -1:
-            # use <= and -1 on right side, linearize conditional constraint
-            solver.Add(mlz[i] <= mlz[j] - 1 + len(points) * (1 - x[i, j, k]))
+            model.Add(mlz[i] + 1 == mlz[j]).OnlyEnforceIf(x[i, j, k])
         if k != -1:
-            solver.Add(mlz[j] <= mlz[k] - 1 + len(points) * (1 - x[i, j, k]))
+            model.Add(mlz[j] + 1 == mlz[k]).OnlyEnforceIf(x[i, j, k])
 
-    # every start index has a node except end index
-    for i in range(-1, len(points)):
-        solver.Add(sum(x[i, j, k] for i2, j, k in x if i2 == i) <= 1)
-    # every turn index has a node
-    for j in range(len(points)):
-        solver.Add(sum(x[i, j, k] for i, j2, k in x if j2 == j) == 1)
-    # every end index has a node except start index
-    for k in range(-1, len(points)):
-        solver.Add(sum(x[i, j, k] for i, j, k2 in x if k2 == k) <= 1)
     # the number of selected nodes matches the number of points
-    solver.Add(sum(x[i, j, k] for i, j, k in x) == len(points))
+    # model.Add(cp_model.LinearExpr.Sum(tuple(x[i, j, k] for i, j, k in x)) == len(points))
 
     # ensure i and k are only once -1
-    solver.Add(sum(x[i, j, k] for i, j, k in x if i == -1) == 1)
-    solver.Add(sum(x[i, j, k] for i, j, k in x if k == -1) == 1)
+    # every i is <= 1
+    for i in range(-1, len(points)):
+        model.AddAtMostOne(tuple(x[i, j, k] for i2, j, k in x if i2 == i))
+    # every j is 1
+    for j in range(len(points)):
+        model.AddExactlyOne(tuple(x[i, j, k] for i, j2, k in x if j2 == j))
+    # every k is <= 1
+    for k in range(-1, len(points)):
+        model.AddAtMostOne(tuple(x[i, j, k] for i, j, k2 in x if k2 == k))
 
-    print(f'Number of constraints: {solver.NumConstraints()}')
-
-    # create objective
-    objective = solver.Objective()
-    for i, j, k in x:
+    def coeff(i, j, k):
         coeff = 0
         if i != -1:
             coeff += 0.5 * distance(points[i], points[j])
         if k != -1:
             coeff += 0.5 * distance(points[j], points[k])
-        objective.SetCoefficient(x[i, j, k], coeff)
-    objective.SetMinimization()
+        return coeff
 
-    # solve
-    status = solver.Solve()
+    model.Minimize(
+        cp_model.LinearExpr.WeightedSum(
+            tuple(x[i, j, k] for i, j, k in x),
+            tuple(coeff(i, j, k) for i, j, k in x)
+        ))
+    
+    solver = cp_model.CpSolver()
+    status = solver.Solve(model)
 
-    # print solution
-    if status == pywraplp.Solver.OPTIMAL or status == pywraplp.Solver.FEASIBLE:
-        solver.VerifySolution(1e-7, True)
-        print(f'Objective value: {objective.Value()}')
-        if (status == pywraplp.Solver.FEASIBLE):
+
+# print solution
+    if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
+        if (status == cp_model.FEASIBLE):
             print('A potentially suboptimal solution.')
 
         G = nx.Graph()
@@ -108,7 +99,7 @@ def main(points: List[Tuple[float, float]]):
             G.add_node(i, pos=points[i])
         num = 0
         for i, j, k in x:
-            if x[i, j, k].solution_value() == 1:
+            if solver.Value(x[i, j, k]) == 1:
                 num += 1
                 if i != -1:
                     G.add_edge(i, j)
@@ -117,7 +108,7 @@ def main(points: List[Tuple[float, float]]):
 
         print(f'Number of selected: {num} of {len(points)}')
         for i, j, k in x:
-            if a := x[i, j, k].solution_value():
+            if a := solver.Value(x[i, j, k]):
                 if i == -1 and a:
                     print('i', i, i, j)
                 if k == -1 and a:

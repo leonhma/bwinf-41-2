@@ -8,6 +8,9 @@ import networkx as nx
 import matplotlib.pyplot as plt
 
 
+ANGLE_UPPER_BOUND = 90
+ANGLE_COST_FACTOR = 0
+
 @lru_cache(maxsize=None)    # cache the results of this function for speeed
 def distance(p1: Tuple[int, int], p2: Tuple[int, int]) -> float:
     return (
@@ -37,6 +40,7 @@ def angle(p1: Tuple[int, int], p2: Tuple[int, int], p3: Tuple[int, int]) -> floa
 # pylama:ignore=C901
 def main(points: List[Tuple[float, float]]):
 
+    print('creating solver')
     # create the solver
     solver = pywraplp.Solver.CreateSolver('CP_SAT')
     if not solver:
@@ -44,53 +48,60 @@ def main(points: List[Tuple[float, float]]):
         return
     solver.SetTimeLimit(120000)
 
+    print('precomputing angles')
+    a = {}
+    for i, j, k in itertools.permutations(range(-1, len(points)), 3):
+        if i >= k
+        if -1 in (i, j, k):
+            a[i, j, k] = 0
+        else:
+            a[i, j, k] = angle(points[i], points[j], points[k])
+
+    print('creating variables')
     # create variables
     # create 3d variable matrix where angle doesn't exceed 90°
     x = {}
-    for j in range(len(points)):
-        for i, k in itertools.permutations(range(-1, len(points)), 2):
-            if (i != k and j not in (i, k) and
-                    ((i == -1 or k == -1) or angle(points[i], points[j], points[k]) <= 90)):
-                x[i, j, k] = solver.BoolVar(f'x_{i}_{j}_{k}')
-    mlz = {i: solver.IntVar(0, len(points) - 1, f'mlz_{i}') for i in range(len(points))}  # added -1 here 
+    for i, j in itertools.permutations(range(-1, len(points)), 2):
+        if i != j:
+            x[i, j] = solver.BoolVar(f'x_{i}_{j}')
+    mlz = {i: solver.IntVar(0, len(points) - 1, f'mlz_{i}') for i in range(len(points))}
+    angle_ub = solver.IntVar(0, ANGLE_UPPER_BOUND, 'angle_ub')
+
     print(f'Number of variables: {solver.NumVariables()}')
 
+    print('creating constraints')
     # create the constraints
     # no subtours are created
-    for i, j, k in x:
-        if i != -1:
+    for i, j in x:
+        if -1 not in (i, j):
             # use <= and -1 on right side, linearize conditional constraint
-            solver.Add(mlz[i] <= mlz[j] - 1 + len(points) * (1 - x[i, j, k]))
-        if k != -1:
-            solver.Add(mlz[j] <= mlz[k] - 1 + len(points) * (1 - x[i, j, k]))
+            solver.Add(mlz[i] <= mlz[j] - 1 + len(points) * (1 - x[i, j]))
+    print('done creating mtz constraints')
 
-    # every start index has a node except end index
+    # every node has a next except end index
     for i in range(-1, len(points)):
-        solver.Add(sum(x[i, j, k] for i2, j, k in x if i2 == i) <= 1)
-    # every turn index has a node
-    for j in range(len(points)):
-        solver.Add(sum(x[i, j, k] for i, j2, k in x if j2 == j) == 1)
-    # every end index has a node except start index
-    for k in range(-1, len(points)):
-        solver.Add(sum(x[i, j, k] for i, j, k2 in x if k2 == k) <= 1)
-    # the number of selected nodes matches the number of points
-    solver.Add(sum(x[i, j, k] for i, j, k in x) == len(points))
+        solver.Add(sum(x[i, j] for i2, j in x if i2 == i) == 1)
+    # every node has a previous except start index
+    for j in range(-1, len(points)):
+        solver.Add(sum(x[i, j] for i, j2 in x if j2 == j) == 1)
+    # the number of selected nodes matches the number of points + 1 (start-/end marker)
+    print('done creating next/prev constraints')
 
-    # ensure i and k are only once -1
-    solver.Add(sum(x[i, j, k] for i, j, k in x if i == -1) == 1)
-    solver.Add(sum(x[i, j, k] for i, j, k in x if k == -1) == 1)
+    # angle <= angle_ub
+    for i, j, k in a:
+        if i < j and (i, j) in x and (j, k) in x:
+            solver.Add(a[i, j, k] <= angle_ub + 180 * (1 - x[i, j]) + 180 * (1 - x[j, k]))
+    print('done creating angle constraints')
 
     print(f'Number of constraints: {solver.NumConstraints()}')
 
+    print('creating objective')
     # create objective
     objective = solver.Objective()
-    for i, j, k in x:
-        coeff = 0
-        if i != -1:
-            coeff += 0.5 * distance(points[i], points[j])
-        if k != -1:
-            coeff += 0.5 * distance(points[j], points[k])
-        objective.SetCoefficient(x[i, j, k], coeff)
+    for i, j in x:
+        if -1 not in (i, j):
+            objective.SetCoefficient(x[i, j], distance(points[i], points[j]))
+    # TODO: add angle_ub cost
     objective.SetMinimization()
 
     # solve
@@ -107,21 +118,18 @@ def main(points: List[Tuple[float, float]]):
         for i in range(len(points)):
             G.add_node(i, pos=points[i])
         num = 0
-        for i, j, k in x:
-            if x[i, j, k].solution_value() == 1:
+        for i, j in x:
+            if -1 not in (i, j) and x[i, j].solution_value() == 1:
                 num += 1
-                if i != -1:
-                    G.add_edge(i, j)
-                if k != -1:
-                    G.add_edge(j, k)
+                G.add_edge(i, j)
 
         print(f'Number of selected: {num} of {len(points)}')
-        for i, j, k in x:
-            if a := x[i, j, k].solution_value():
-                if i == -1 and a:
-                    print('i', i, i, j)
-                if k == -1 and a:
-                    print('k', i, j, k)
+        for i, j in x:
+            if ab := x[i, j].solution_value():
+                if i == -1 and ab:
+                    print('i', i, i)
+                if j == -1 and ab:
+                    print('j', i, j)
 
         pos = nx.get_node_attributes(G, 'pos')
         nx.draw(G, pos, with_labels=True)
