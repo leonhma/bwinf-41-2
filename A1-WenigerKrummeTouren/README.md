@@ -58,7 +58,7 @@ In den ersten Zeilen des Programms finden sich Konstanten, mit denen sich das Ve
 ```python
 ANGLE_UPPER_BOUND = 90
 ANGLE_COST_FACTOR = 0
-SOLVER_MAX_TIME = 60 * 2    # 2 Minuten Berechnungszeit
+SOLVER_MAX_TIME = 60 * 4    # 4 Minuten Berechnungszeit
 ```
 
 #### Maximaler Winkel
@@ -74,6 +74,10 @@ Einer der weiteren anpassbaren Parameter (`ANGLE_COST_FACTOR`) fügt den maximal
 #### Halbierung der Anzahl der berechneten Winkel
 
 Da der Winkel $a_{kji}$ gleich dem Winkel $a_{ijk}$ ist, wird nur letzerer berechnet, und für diesen nun Bedingungen in beide Richtungen ($x_{ij} \wedge x_{jk}$ und $x_{kj} \wedge x_{ji}$) hinzugefügt. Die Anzahl der vorberechneten Winkel wird somit halbiert.
+
+#### Halbierung der Anzahl der berechneten Distanzen
+
+Da die Distanz $c_{ji}$ gleich der Distanz $c_{ij}$ ist, wird nur letzere berechnet, und für diese nun Bedingungen in beide Richtungen ($x_{ij}$ und $x_{ji}$) hinzugefügt. Die Anzahl der berechneten Distanzen wird somit halbiert.
 
 ### Qualität der Ergebnisse
 

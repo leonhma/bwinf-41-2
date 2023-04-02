@@ -11,7 +11,7 @@ from ortools.linear_solver import pywraplp
 
 ANGLE_UPPER_BOUND = 90
 ANGLE_COST_FACTOR = 0       # 0.005
-SOLVER_MAX_TIME = 60 * 2    # 2 Minuten Berechnungszeit
+SOLVER_MAX_TIME = 60 * 4    # 4 Minuten Berechnungszeit
 
 
 class ExitException(BaseException):
@@ -70,7 +70,7 @@ def main(points: List[Tuple[float, float]], fname: str, solver_name: str = 'CP_S
     for i, j, k in itertools.permutations(range(-1, len(points)), 3):
         if i < k and j not in (i, k):
             if -1 in (i, j, k):  # winkel beinhaltet den 'unsichbaren' Start- / Endknoten
-                a[i, j, k] = 0 
+                a[i, j, k] = 0
             else:
                 a[i, j, k] = angle(points[i], points[j], points[k])
 
@@ -78,32 +78,38 @@ def main(points: List[Tuple[float, float]], fname: str, solver_name: str = 'CP_S
     # create 2d binary matrix [node index, next node index]
     x = {}
     for i, j in itertools.permutations(range(-1, len(points)), 2):
-        if i != j:
+        if i < j:
             x[i, j] = solver.BoolVar(f'x_{i}_{j}')
     # create miller-tucker-zemlin variables
-    t = {i: solver.IntVar(0, len(points) - 1, f't_{i}') for i in range(len(points))}
+    # t = {i: solver.IntVar(0, len(points) - 1, f't_{i}') for i in range(len(points))}
     # create angle upper bound variable
     angle_ub = solver.IntVar(0, ANGLE_UPPER_BOUND, 'angle_ub')
 
     print(f'\033[1A\033[2KAnzahl der Variablen: {solver.NumVariables()}\n')
 
     print('Erstelle Bedingungen...')
-    # mtz subtour elimination
-    for i, j in x:
-        if -1 not in (i, j):
-            # use <= and -1 on right side, linearize conditional constraint
-            solver.Add(t[i] <= t[j] - 1 + len(points) * (1 - x[i, j]))
-    # every node has a next node
-    for i in range(-1, len(points)):
-        solver.Add(sum(x[i, j] for i2, j in x if i2 == i) == 1)
-    # every node has a previous node
-    for j in range(-1, len(points)):
-        solver.Add(sum(x[i, j] for i, j2 in x if j2 == j) == 1)
+    # mtz subtour elimination TODO different subtour elimination
+    # for i, j in x:
+    #     if -1 not in (i, j):
+    #         # use <= and -1 on right side, linearize conditional constraint
+    #         solver.Add(t[i] <= t[j] - 1 + len(points) * (1 - x[i, j]))
+    # subtour elimination TODO doesnt work
+    # for j_ in range(len(points)):
+    #     print(f'adding contraint for {j_=}')
+    #     solver.Add(sum(x[i, j] for i, j in x if j == j_) >= 1)
+    # print('\n\n')
+    # der Grad jedes Knotens ist 2
+    for n in range(-1, len(points)):
+        solver.Add(sum(x[i, j] for i, j in x if n in (i, j)) == 2)
     # angle <= angle_ub
-    for i, j, k in a:
-        if i < k and (i, j) in x and (j, k) in x:
-            solver.Add(a[i, j, k] <= angle_ub + 180 * (1 - x[i, j]) + 180 * (1 - x[j, k]))
-            solver.Add(a[i, j, k] <= angle_ub + 180 * (1 - x[k, j]) + 180 * (1 - x[j, i]))
+    for i, j, k in a:  # => i < k
+        if (i, j) in x:
+            if (j, k) in x:  # => i < j < k
+                solver.Add(a[i, j, k] <= angle_ub + 180 * (1 - x[i, j]) + 180 * (1 - x[j, k]))
+            else:  # => i < k < j
+                solver.Add(a[i, j, k] <= angle_ub + 180 * (1 - x[i, j]) + 180 * (1 - x[k, j]))
+        elif (j, k) in x:  # => j < i < k
+            solver.Add(a[i, j, k] <= angle_ub + 180 * (1 - x[j, i]) + 180 * (1 - x[j, k]))
 
     print(f'\033[1A\033[2K\033[1AAnzahl der Bedingungen: {solver.NumConstraints()}\n')
 
@@ -113,7 +119,6 @@ def main(points: List[Tuple[float, float]], fname: str, solver_name: str = 'CP_S
         if -1 not in (i, j) and i < j:
             dist = distance(points[i], points[j])
             objective.SetCoefficient(x[i, j], dist)
-            objective.SetCoefficient(x[j, i], dist)
     # add angle cost with factor
     objective.SetCoefficient(angle_ub, avg_arc_cost * len(points) * ANGLE_COST_FACTOR)
     objective.SetMinimization()
@@ -142,6 +147,10 @@ def main(points: List[Tuple[float, float]], fname: str, solver_name: str = 'CP_S
             if -1 not in (i, j) and x[i, j].solution_value() == 1:
                 G.add_edge(i, j)
 
+        # for j_ in range(len(points)):
+        #     if not sum(x[i, j].solution_value() for i, j in x if j == j_) >= 1:
+        #         print(f'Subtour constraint not satisfied for {j_=}')
+
         for node in G.nodes:
             neighbors = list(G.neighbors(node))
             if len(neighbors) == 2:
@@ -159,9 +168,10 @@ def main(points: List[Tuple[float, float]], fname: str, solver_name: str = 'CP_S
 
         nx.draw(G,
                 pos,
-                node_size=25,
+                node_size=300,  # 25
                 font_size=8,
                 node_color=colors,
+                with_labels=True,  # remove to hide labels
                 edgecolors='k')
 
         plt.show()
@@ -180,7 +190,7 @@ if __name__ == '__main__':
                     points = [tuple(map(float, line.split())) for line in f.readlines()]
                 main(tuple(points), fname)
             except Exception as e:
-                print(e)
+                raise e
     except ExitException as e:
         print(e)
         exit()

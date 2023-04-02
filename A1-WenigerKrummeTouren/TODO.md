@@ -12,6 +12,8 @@ https://how-to.aimms.com/Articles/332/332-Miller-Tucker-Zemlin-formulation.html
 
 solution is optimal, but there may be other optimal solutions
 
+zu große abbiegewinkle werden rot markiert
+
 eine laufzeitanalyse nicht sinnvoll
 
 angles over 90 deg are highlighted red
