@@ -16,7 +16,7 @@
 Das Netz der Außenposten wird als Graph betrachtet.
 Gegeben sei ein kompletter Graph $G(V, E)$, der die möglichen Verbindungen zwischen den einzelnen Knoten darstellt.
 $V$ stellt Menge der Außenposten, und $E$ ist die Menge der möglichen Verbindungen dieser dar.
-Nun gilt es als Lösung einen Hamilton-Graph $L(V, E_L)$ zu konstruieren, der die Bedingungen $E_L \subset E$ und $|E_L| = |V| - 1$ erfüllt.
+Nun gilt es als Lösung einen Hamiltonkreis $L(V, E_L)$ zu konstruieren, der die Bedingungen $E_L \subset E$ und $|E_L| = |V| - 1$ erfüllt.
 Zusätzlich dazu müssen auch noch die Vorgaben aus der Aufgabenstellung (keine Abbiegewinkel über $90°$ und die Minimierung der Strecke) beachtet werden.
 
 Für eine arbiträre Liste von Außenstellen und deren Koordinaten kann nicht immer eine Lösung gefunden werden. Das Liegt daran dass es sein kann, dass eine Außenstelle keine zwei Nachbaren hat, mit denen sie einen Abbiegewinkel unter $90°$ bilden kann. Hier ein Beispiel:
@@ -26,7 +26,7 @@ Wie man sieht kann hier (leicht überprüfbar) kein Pfad gefunden werden, der di
 
 Modelliert wird diese Aufgabenstellung mit einem Integer-Linear-Programming Modell, bestehend aus einer Matrix von binären Variablen die angeben, ob zwischen zwei Knoten ein Verbindung besteht.
 
-Diese Aufgabe (die Suche nach einem optimalen Pfad) ähnelt sehr stark dem Travelling-Salesman-Problem, und teilt mit diesem auch seine Klassifizierung als NP-Schwer. Während eine Suche nach einer Lösung, die die Abiegewinkel- und Grapheigenschaften-Vorgaben erfüllt durch ILP auf ein SAT-Problem reduziert werden kann und somit NP-Komplett ist, ist die Suche nahc einer optimale Lösung NP-Schwer, da sich eine Lösung nicht in Polynom-Zeit verifizieren lässt. Ein ähnlicher Aufwand muss für den Beweis der Unauffindbarkeit einer möglichen Route vollbracht werden. Dieser Befindet sich als Umkehrung des vorher genannten SAT-Problems in der Klasse co-NP. TODO check this
+Diese Aufgabe (die Suche nach einem optimalen Pfad) ähnelt sehr stark dem Travelling-Salesman-Problem, und teilt mit diesem auch seine Klassifizierung als NP-Schwer. Während eine Suche nach einer Lösung, die die Abiegewinkel- und Grapheigenschaften-Vorgaben erfüllt durch ILP auf ein SAT-Problem reduziert werden kann und somit NP-Komplett ist, ist die Suche nach einer optimale Lösung NP-Schwer, da sich eine Lösung nicht in Polynom-Zeit verifizieren lässt. Ein ähnlicher Aufwand muss für den Beweis der Unauffindbarkeit einer möglichen Route vollbracht werden. Dieser Befindet sich als Umkehrung des vorher genannten SAT-Problems in der Klasse co-NP. TODO check this
 
 ## Umsetzung
 
@@ -77,7 +77,7 @@ Da der Winkel $a_{kji}$ gleich dem Winkel $a_{ijk}$ ist, wird nur letzerer berec
 
 ### Qualität der Ergebnisse
 
-Das Integer-Linear-Programming Verfahren ist in der Lage, optimale Ergebnisse zu liefern ('optimal' heißt hier nicht 'exklusiv optimal'). Da aber einige sehr große Instanzen bearbeitet werden, wird in zwei Minuten meist nur eine sinnvolle Lösung erreicht.
+Das Integer-Linear-Programming Verfahren ist in der Lage, optimale Ergebnisse zu liefern ('optimal' heißt hier nicht 'exklusiv optimal'). Da aber einige sehr große Instanzen bearbeitet werden, wird in zwei Minuten teilweise nur eine sinnvolle Lösung erreicht.
 
 2min 14 core
 
