@@ -10,8 +10,8 @@ import networkx as nx
 from ortools.linear_solver import pywraplp
 
 ANGLE_UPPER_BOUND = 90
-ANGLE_COST_FACTOR = 0       # 0.005
-SOLVER_MAX_TIME = 60 * 4    # 4 Minuten Berechnungszeit
+ANGLE_COST_FACTOR = 0
+SOLVER_MAX_TIME = 60 * 3    # 3 Minuten Berechnungszeit
 
 
 class ExitException(BaseException):
@@ -141,10 +141,6 @@ def main(points: List[Tuple[float, float]], fname: str, solver_name: str = 'CP_S
         for i, j in x:
             if -1 not in (i, j) and x[i, j].solution_value() == 1:
                 G.add_edge(i, j)
-
-        # for j_ in range(len(points)):
-        #     if not sum(x[i, j].solution_value() for i, j in x if j == j_) >= 1:
-        #         print(f'Subtour constraint not satisfied for {j_=}')
 
         for node in G.nodes:
             neighbors = list(G.neighbors(node))
