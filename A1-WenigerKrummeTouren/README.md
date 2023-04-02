@@ -26,11 +26,11 @@ Wie man sieht kann hier (leicht überprüfbar) kein Pfad gefunden werden, der di
 
 Modelliert wird diese Aufgabenstellung mit einem Integer-Linear-Programming Modell, bestehend aus einer Matrix von binären Variablen die angeben, ob zwischen zwei Knoten ein Verbindung besteht.
 
-Diese Aufgabe (die Suche nach einem optimalen Pfad) ähnelt sehr stark dem Travelling-Salesman-Problem, und teilt mit diesem auch seine Klassifizierung als NP-Schwer. Während eine Suche nach einer Lösung, die die Abiegewinkel- und Grapheigenschaften-Vorgaben erfüllt durch ILP auf ein SAT-Problem reduziert werden kann und somit NP-Komplett ist, ist die Suche nach einer optimale Lösung NP-Schwer, da sich eine Lösung nicht in Polynom-Zeit verifizieren lässt. Ein ähnlicher Aufwand muss für den Beweis der Unauffindbarkeit einer möglichen Route vollbracht werden. Dieser Befindet sich als Umkehrung des vorher genannten SAT-Problems in der Klasse co-NP. TODO check this
+Diese Aufgabe (die Suche nach einem optimalen Pfad) ähnelt sehr stark dem Travelling-Salesman-Problem, und teilt mit diesem auch seine Klassifizierung als NP-Schwer. Während eine Suche nach irgendeiner Lösung, die die Abiegewinkel- und Grapheigenschaften-Vorgaben erfüllt durch ILP auf ein SAT-Problem reduziert werden kann und somit NP-Komplett ist, ist die Suche nach einer optimalen Lösung NP-Schwer, da sich eine Lösung nicht in Polynom-Zeit verifizieren lässt. Ein ähnlicher Aufwand muss für den Beweis der Unauffindbarkeit einer möglichen Route vollbracht werden. Dieser Befindet sich als Umkehrung des vorher genannten SAT-Problems in der Klasse co-NP. TODO check this
 
 ## Umsetzung
 
-Wie vorher genannt wird die Aufgabenstellung als Integer-Linear-Programming Problem formuliert. Hierzu wird eine Matrix an binären Variablen mit den Indices $-1, ..., |V|-1$ erstellt, die besagt, ob ein Knoten $i$ mit dem Knoten $j$ verbunden ist. Der Index $-1$ ist dafür zuständig, den Start und das Ende der Tour zu markieren und wird in der Wegkostenberechnung nicht berücksichtigt. $W$ sei $V\cup\set{-1}$.
+Wie vorher genannt wird die Aufgabenstellung als Integer-Linear-Programming Problem formuliert. $W$ sei $V\cup\set{-1}$. Hierzu wird eine 2d-Matrix an binären Variablen $x_{ij}\quad(i,j)\in W$ erstellt, die besagt, ob ein Knoten $i$ mit dem Knoten $j$ verbunden ist. Der Index $-1$ ist dafür zuständig, den Start und das Ende der Tour zu markieren und wird in der Wegkostenberechnung nicht berücksichtigt.
 
 Um bei jedem Knoten einen Grad von $\delta(v)=2\quad v\in W$ sicherzustellen, werden zwei Bedingungen eingeführt:
 $$\sum_{j\in W}x_{ij} = 1\qquad i \in W\tag 1$$
@@ -44,10 +44,10 @@ Zuletzt muss noch die Winkel-Vorgabe berücksichtigt werden. Sei $p_i$ die Koord
 $$x_{ij} \wedge x_{jk} \implies a_{ijk} \le 90 \qquad (i, j, k) \in V^3 \tag 4$$
 
 Als zu minimierende Funktion wird der Gesamtweg berechnet. $c_{ij}\quad (i, j)\in V^2$ sei der Abstand zwischen den Knoten $i$ und $j$.
-$$\text{minimize}\quad\sum_{i \in V}\sum_{j \in V}c_{ij} x_{ij}\tag{5}$$
+$$\text{min}\quad\sum_{i \in V}\sum_{j \in V}c_{ij} x_{ij}\tag{5}$$
 
 Im Quelltext sind diese Beschränkungen in linearisierter Form zu finden.
-Das Programm ist in der Sprache Python umgesetzt und ab der Version `3.6` ausführbar. Zur Lösung wird die von Google entwicklete Bibliothek `ortools` neben einigen anderen Paketen verwendet, die mit `pip install -r requirements.txt` installiert werden können. Das Programm erstellt das ILP-Modell, sucht mit einem Zeitlimit von 2 Minuten nach einer Lösung und gibt diese aus.
+Das Programm ist in der Sprache Python umgesetzt und ab der Version `3.6` ausführbar. Zur Lösung wird die von Google entwicklete Bibliothek `ortools` neben einigen anderen Paketen verwendet, die mit `pip install -r requirements.txt` installiert werden können. Das Programm erstellt das ILP-Modell, sucht dann mit einem Zeitlimit von 2 Minuten nach einer Lösung und gibt diese aus.
 
 ### Verbesserungen
 

@@ -50,7 +50,7 @@ def main(points: List[Tuple[float, float]], fname: str, solver_name: str = 'CP_S
     print('Berechne ungefähren Mittelwert der Kantenlängen...')
     avg_arc_cost = 0
     avg_arc_n = 0
-    for _ in range(100):
+    for _ in range(1000):
         i, j = random.sample(range(len(points)), 2)
         avg_arc_cost += distance(points[i], points[j])
         avg_arc_n += 1
@@ -65,12 +65,12 @@ def main(points: List[Tuple[float, float]], fname: str, solver_name: str = 'CP_S
     solver.SetNumThreads(max(1, os.cpu_count() - 2))
 
     print('\033[1A\033[2KVorberechnung der Winkel...')
-    # create angle tensor where i < k
+    # winkel-matrix berechnen
     a = {}
     for i, j, k in itertools.permutations(range(-1, len(points)), 3):
         if i < k and j not in (i, k):
-            if -1 in (i, j, k):
-                a[i, j, k] = 0
+            if -1 in (i, j, k):  # winkel beinhaltet den 'unsichbaren' Start- / Endknoten
+                a[i, j, k] = 0 
             else:
                 a[i, j, k] = angle(points[i], points[j], points[k])
 
@@ -110,8 +110,10 @@ def main(points: List[Tuple[float, float]], fname: str, solver_name: str = 'CP_S
     print('Erstelle Ziel...')
     objective = solver.Objective()
     for i, j in x:
-        if -1 not in (i, j):
-            objective.SetCoefficient(x[i, j], distance(points[i], points[j]))
+        if -1 not in (i, j) and i < j:
+            dist = distance(points[i], points[j])
+            objective.SetCoefficient(x[i, j], dist)
+            objective.SetCoefficient(x[j, i], dist)
     # add angle cost with factor
     objective.SetCoefficient(angle_ub, avg_arc_cost * len(points) * ANGLE_COST_FACTOR)
     objective.SetMinimization()
@@ -127,7 +129,7 @@ def main(points: List[Tuple[float, float]], fname: str, solver_name: str = 'CP_S
         solver.VerifySolution(1e-7, True)
         status_name = 'OPTIMAL' if status == pywraplp.Solver.OPTIMAL else 'FEASIBLE'
 
-        print(f'Zeit: {time} ms')
+        print(f'Zeit: {time/1000:.2f}s')
         print(f'Status: {status_name}')
         print(f'Länge: {objective.Value():.2f}km')
         print(f'Winkel-UB: {int(angle_ub.solution_value())}°')
@@ -144,7 +146,7 @@ def main(points: List[Tuple[float, float]], fname: str, solver_name: str = 'CP_S
             neighbors = list(G.neighbors(node))
             if len(neighbors) == 2:
                 a, b = neighbors
-                if angle(points[a], points[node], points[b]) > 90:
+                if angle(points[a], points[node], points[b]) > ANGLE_UPPER_BOUND:
                     G.nodes[node]['color'] = 'r'
 
         ax = plt.gca()
@@ -186,9 +188,3 @@ if __name__ == '__main__':
         print()
         print('Abbruch durch Benutzer.')
         exit()
-
-# TODO add angle_ub cost
-# TODO test solvers
-# TODO file ouput
-# TODO angle_ub is int
-# TODO is t necessary?
