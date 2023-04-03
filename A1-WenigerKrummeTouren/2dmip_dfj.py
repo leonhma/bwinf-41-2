@@ -9,11 +9,11 @@ import math
 import itertools
 import random
 
-from typing import List, Tuple
+from typing import Dict, List, Set, Tuple
 
 ANGLE_UPPER_BOUND = 90
 ANGLE_COST_FACTOR = 0       # 0.002
-SOLVER_MAX_TIME = 60 * 5    # 3 Minuten Berechnungszeit
+SOLVER_MAX_TIME = 60 * 2    # 2 Minuten Berechnungszeit
 
 
 def distance(p1: Tuple[int, int], p2: Tuple[int, int]) -> float:
@@ -41,14 +41,49 @@ def angle(p1: Tuple[int, int], p2: Tuple[int, int], p3: Tuple[int, int]) -> floa
     return 180 - math.degrees(math.acos(cos))
 
 
+class SubtourAndAngleConstraintGenerator(mip.ConstrsGenerator):
+    def __init__(self,
+                 F: List[Tuple[int, int]],
+                 V: Set[int],
+                 x_: Dict[Tuple[int, int], mip.Var]):
+        self.F, self. V, self.x = F, V, x_
+
+    def generate_constrs(self, model: mip.Model, depth: int = 0, npass: int = 0):
+        xf, cp = model.translate(self.x), mip.CutPool()
+        # check subtours
+        G = nx.DiGraph()
+        for (i, j) in xf:
+            if xf[i, j] >= 0.99:
+                G.add_edge(i, j, capacity=xf[i, j].x)
+        for (u, v) in self.F:
+            try:
+                val, (S, _) = nx.minimum_cut(G, u, v)
+                if val <= 0.99:
+                    aInS = [(xf[i, j], xf[i, j].x)
+                            for (i, j) in xf if (xf[i, j] and i in S and j in S)]
+                    if sum(f for _, f in aInS) >= (len(S) - 1) + 1e-4:
+                        cut = mip.xsum(v for v, _ in aInS) <= len(S) - 1
+                        cp.add(cut)
+            except Exception as e:
+                print(f'Exception for i={u}, j={v}: {e}')
+
+        for cut in cp.cuts:
+            model += cut
+
+
+# pylama:ignore=C901
 def main(points: List[Tuple[float, float]], fname: str):
     start_time = time.time()
     print()
+
+    V = set(range(-1, len(points)))
+    E = {(i, j) for i in V for j in V if i < j}
+
     print('Berechne ungefähren Mittelwert der Kantenlängen...')
     avg_arc_cost = 0
     avg_arc_n = 0
     for _ in range(1000):
-        i, j = random.sample(range(len(points)), 2)
+        i, j = random.sample(V, 2)
         avg_arc_cost += distance(points[i], points[j])
         avg_arc_n += 1
     avg_arc_cost /= avg_arc_n
@@ -56,7 +91,7 @@ def main(points: List[Tuple[float, float]], fname: str):
     print('\033[1A\033[2KVorberechnung der Winkel...')
     # winkel-matrix berechnen
     a = {}
-    for i, j, k in itertools.permutations(range(-1, len(points)), 3):
+    for i, j, k in itertools.permutations(V, 3):
         if i < k and j not in (i, k):
             if -1 in (i, j, k):  # winkel beinhaltet den 'unsichbaren' Start- / Endknoten
                 a[i, j, k] = 0
@@ -66,22 +101,26 @@ def main(points: List[Tuple[float, float]], fname: str):
     print('\033[1A\033[2KErstelle Solver...')
     model = mip.Model(sense=mip.MINIMIZE, solver_name=mip.CBC)
 
-    print('\033[1A\033[2KErstelle Variablen...')
+    # temporärer Graph
+    G = nx.Graph()
 
+    print('\033[1A\033[2KErstelle Variablen...')
     # Entscheidungsvariablen
     x = {}
-    for i, j in itertools.permutations(range(-1, len(points)), 2):
+    for i, j in E:
         if i < j:
-            x[i, j] = model.add_var(name=f'x_{i}_{j}', obj=distance(points[i], points[j]), var_type=mip.BINARY)
+            dist = distance(points[i], points[j])
+            # Variable hinzufügen
+            x[i, j] = model.add_var(name=f'x_{i}_{j}',
+                                    obj=dist,
+                                    var_type=mip.BINARY)
+            # Kante in temporärem Graphen hinzufügen
+            G.add_edge(i, j, weight=dist)
 
-    # Winkel-UB
-    angle_ub = model.add_var(name='angle_ub', lb=0, ub=ANGLE_UPPER_BOUND,
-                             obj=ANGLE_COST_FACTOR * len(points) * avg_arc_cost,
-                             var_type=mip.CONTINUOUS)
-
-    # Jeder Knoten muss Grad 2 haben
-    for n in range(-1, len(points)):
-        model += (sum(x[i, j] for i, j in x if n in (i, j)) == 2)
+    angle_ub = model.add_var(name='angle_ub',
+                             var_type=mip.CONTINUOUS,
+                             lb=0, ub=ANGLE_UPPER_BOUND,
+                             obj=ANGLE_COST_FACTOR * len(V) * avg_arc_cost)
 
     # angle <= angle_ub
     for i, j, k in a:  # => i < k
@@ -93,7 +132,26 @@ def main(points: List[Tuple[float, float]], fname: str):
         elif (j, k) in x:  # => j < i < k
             model += (a[i, j, k] <= angle_ub + 180 * (1 - x[j, i]) + 180 * (1 - x[j, k]))
 
+    print(f'Anzahl Variablen: {len(x)}')
+
+    # Jeder Knoten muss Grad 2 haben
+    for n in V:
+        model += (sum(x[i, j] for i, j in x if n in (i, j)) == 2)
+
+    # Berechnung des am weistesten entfernten Knoten zu i für alle i in V
+    F = []
+    for i in V:
+        _, D = nx.dijkstra_predecessor_and_distance(G, source=i)
+        DS = list(D.items())
+        DS.sort(key=lambda x: x[1])
+        F.append((i, DS[-1][0]))
+
+    print(F)
+
     # Lösung starten
+    model.verbose = 0
+    model.cuts_generator = SubtourAndAngleConstraintGenerator(F, V, x)
+    model.lazy_constrs_generator = SubtourAndAngleConstraintGenerator(F, V, x)
     status = model.optimize(max_seconds=SOLVER_MAX_TIME)
     print(status)
 
@@ -104,7 +162,6 @@ def main(points: List[Tuple[float, float]], fname: str):
         print(f'Zeit: {time.time() - start_time:.2f}s')
         print(f'Status: {status}')
         print(f'Länge: {model.objective_value:.2f}km (bound is {model.objective_bound:.2f}km)')
-        print(f'Winkel-UB: {angle_ub.x:.2f}°')
 
         G = nx.Graph()
         for i in range(len(points)):
@@ -159,3 +216,5 @@ if __name__ == '__main__':
         exit()
 
 # TODO add constraint generator for angles
+# TODO add constraint generator for dfj
+# TODO test on solvers (gurobi)
