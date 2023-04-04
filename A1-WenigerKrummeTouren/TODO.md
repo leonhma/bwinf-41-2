@@ -18,3 +18,5 @@ zu große abbiegewinkle werden rot markiert
 eine laufzeitanalyse nicht sinnvoll
 
 https://orinanobworld.blogspot.com/2012/08/user-cuts-versus-lazy-constraints.html
+
+objective function
