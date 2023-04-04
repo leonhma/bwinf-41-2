@@ -20,3 +20,25 @@ eine laufzeitanalyse nicht sinnvoll
 https://orinanobworld.blogspot.com/2012/08/user-cuts-versus-lazy-constraints.html
 
 objective function
+
+-----
+
+beweis komplexität
+
+beispiele aussagekräftig + eigene beispiele
+
+grenzen der berechenbarkeit fast erreicht
+
+lp relaxation
+
+"adjazenzmatrix"
+
+"ungleichunge stelle sicher, dass der pfad die vorgaben erfüllt"
+
+tatsächlicher größer winkel statt angle_ub
+
+why use mtz and directed graph
+
+mehrere lösungsansätze
+
+verbesserungen und deren schwierigkeiten
