@@ -1,0 +1,4 @@
+matplotlib==3.6.2
+mip==1.15.0
+networkx==3.0
+ortools==9.6.2534
