@@ -19,29 +19,33 @@ class ExitException(BaseException):
     pass
 
 
-def distance(p1: Tuple[int, int], p2: Tuple[int, int]) -> float:
-    return (
-        (p1[0] - p2[0]) ** 2 +
-        (p1[1] - p2[1]) ** 2) ** 0.5
-
-
-def dot(a, b):
+# Skalarprodukt zweier Vektoren
+def dot(a: Tuple[float, ...], b: Tuple[float, ...]):
     return sum(map(operator.mul, a, b))
 
 
-def sub(a, b):
+# Abzug von Vektoren
+def sub(a: Tuple[float, ...], b: Tuple[float, ...]):
     return tuple(map(operator.sub, a, b))
 
 
-def norm(a):
-    return math.sqrt(dot(a, a))
+# Länge eines Vektors
+def norm(a: Tuple[float, ...]):
+    return math.hypot(*a)
 
 
+# Winkel zwischen drei Punkten
 def angle(p1: Tuple[int, int], p2: Tuple[int, int], p3: Tuple[int, int]) -> float:
     ba = sub(p1, p2)
     bc = sub(p3, p2)
-    cos = max(min(dot(ba, bc) / (norm(ba) * norm(bc)), 1), -1)  # clamp to [-1, 1]
+    # Beschränken auf [-1, 1] um Rundungsfehler zu vermeiden
+    cos = max(min(dot(ba, bc) / (norm(ba) * norm(bc)), 1), -1)
     return 180 - math.degrees(math.acos(cos))
+
+
+# Distanz zwischen zwei Punkten
+def distance(p1: Tuple[int, int], p2: Tuple[int, int]) -> float:
+    return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
 
 
 # pylama:ignore=C901
@@ -188,7 +192,7 @@ def main(points: List[Tuple[float, float]], fname: str):
 
         nx.draw(G,
                 pos,
-                node_size=25,
+                node_size=10,
                 font_size=8,
                 node_color=colors,
                 edgecolors='k')

@@ -7,6 +7,7 @@ class ExitException(BaseException):
     pass
 
 
+# pylama:ignore=C901
 def main(kaesestack: List[Tuple[int, int]], fname: str):
 
     print('Indexiere Käsestapel...')
@@ -15,7 +16,6 @@ def main(kaesestack: List[Tuple[int, int]], fname: str):
         lookup[a].add(i)
         lookup[b].add(i)
     print('\033[1A\033[2K', end='')
-
 
     def get_neighbours(i: int) -> Set[int]:
         a, b = kaesestack[i]
@@ -55,11 +55,7 @@ def main(kaesestack: List[Tuple[int, int]], fname: str):
 
     start = kaesestack[0]
     s = [start[0], start[1], 1]
-    path, size = dfs(0, s, set())
-
-    print('Reihenfolge: ', end='')
-    print(' -> '.join(map(lambda x: f'{kaesestack[x][0]}x{kaesestack[x][1]}', path)))
-    print(f'Größe: {size[0]}x{size[1]}x{size[2]}')
+    return dfs(0, s, set())
 
 
 if __name__ == '__main__':
@@ -71,7 +67,10 @@ if __name__ == '__main__':
                 with open(os.path.join(os.path.dirname(__file__), f'beispieldaten/{fname}')) as f:
                     kaesestack = [tuple(sorted(map(int, f.readline().split())))
                                   for _ in range(int(f.readline()))]
-                main(kaesestack, fname)
+                path, size = main(kaesestack, fname)
+                print('Reihenfolge: ', end='')
+                print(' -> '.join(map(lambda x: f'{kaesestack[x][0]}x{kaesestack[x][1]}', path)))
+                print(f'Größe: {size[0]}x{size[1]}x{size[2]}')
             except Exception as e:
                 print(f'Fehler: {e}')
             finally:

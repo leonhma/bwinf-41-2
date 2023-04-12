@@ -27,6 +27,8 @@ beweis komplexität
 
 beispiele aussagekräftig + eigene beispiele
 
+beispiel angle_ub = 110
+
 grenzen der berechenbarkeit fast erreicht
 
 lp relaxation
@@ -42,3 +44,5 @@ why use mtz and directed graph
 mehrere lösungsansätze
 
 verbesserungen und deren schwierigkeiten
+
+kleinere knotenpunkte in samples
