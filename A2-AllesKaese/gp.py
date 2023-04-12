@@ -7,6 +7,8 @@
 
 import collections
 import os
+from pathlib import Path
+import time
 from typing import List, Set, Tuple
 from alive_progress import alive_bar
 
@@ -33,6 +35,7 @@ class Counter:
 
 # pylama:ignore=C901
 def main(stack: List[Tuple[int, int]]):
+    start_time = time.time()
     # create lookup
     lookup = collections.defaultdict(set)
     for i, (a, b) in enumerate(stack):
@@ -49,11 +52,13 @@ def main(stack: List[Tuple[int, int]]):
     # min_start = min(map(lambda x: x[0], stack))
     # start_nodes_i = list(filter(lambda i: stack[i][0] == min_start, range(len(stack))))
     # TODO go with the start node that improves the quickest
-    start_nodes_i = list(sorted(range(len(stack)), key=lambda i: min(stack[i])))
+    start_nodes_i = list(sorted(range(len(stack)), key=lambda i: stack[i][0] * stack[i][1]))
     seen = set()
     # node, size, to_check
     path = []
+    i = 0
     while True:
+        i += 1
         if not path:
             if start_nodes_i:
                 start = start_nodes_i.pop(0)
@@ -66,10 +71,11 @@ def main(stack: List[Tuple[int, int]]):
         current, size, to_check = path[-1]
         # add current node to seen
         seen.add(current)
-        print(len(path) / len(stack))
+        if i % 100 == 0:
+            print(f'{len(path) / len(stack):.2f}')
         # check if path is complete and return it
         if len(seen) == len(stack):
-            return list(map(lambda x: stack[x[0]], path)), size
+            return list(map(lambda x: stack[x[0]], path)), size, time.time() - start_time
         # if next_neighbors is none, generate them (calculate new size and check for fit and seen)
         if to_check is None:
             to_check = set()
@@ -108,9 +114,18 @@ if __name__ == '__main__':
                 with open(os.path.join(os.path.dirname(__file__), f'beispieldaten/{fname}')) as f:
                     stack = [tuple(sorted(map(int, f.readline().split())))
                              for _ in range(int(f.readline()))]
-                path, size = main(stack)
+                path, size, time_ = main(stack)
+
+                # Ausgabe der Lösung als Datei
+                Path(os.path.join(os.path.dirname(__file__), 'output')).mkdir(parents=True, exist_ok=True)
+                with open(os.path.join(os.path.dirname(__file__), f'output/{fname}'), 'w') as f:
+                    for slice in path:
+                        f.write(f'{slice[0]} {slice[1]}\n')
+
+                print(f'Zeit: {time_:.2f}s')
                 print('Reihenfolge: ', end='')
-                print(' -> '.join(map(lambda x: f'{x[0]}x{x[1]}', path)))
+                print()
+                # print(' -> '.join(map(lambda x: f'{x[0]}x{x[1]}', path)))
                 print(f'Größe: {size[0]}x{size[1]}x{size[2]}')
             except Exception as e:
                 print(f'Fehler: {e}')
