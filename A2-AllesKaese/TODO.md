@@ -20,3 +20,7 @@ muss in zwei dimensionenx üebreinstimmen, aber da dx_3 immer 1 ist, kann die dr
 bsp7 "langer anruf"
 "wohl bekommts"
 "guten appetit"
+
+---
+
+verify solutions
