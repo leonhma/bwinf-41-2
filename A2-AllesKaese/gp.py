@@ -48,14 +48,15 @@ def main(stack: List[Tuple[int, int]]):
 
     # min_start = min(map(lambda x: x[0], stack))
     # start_nodes_i = list(filter(lambda i: stack[i][0] == min_start, range(len(stack))))
-    start_nodes_i = set(range(len(stack)))
+    # TODO go with the start node that improves the quickest
+    start_nodes_i = list(sorted(range(len(stack)), key=lambda i: min(stack[i])))
     seen = set()
     # node, size, to_check
     path = []
     while True:
         if not path:
             if start_nodes_i:
-                start = start_nodes_i.pop()
+                start = start_nodes_i.pop(0)
                 path = [[start,
                         tuple(stack[start] + (1,)),
                         None]]
