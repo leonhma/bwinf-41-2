@@ -47,7 +47,7 @@ Als zu minimierende Funktion wird der Gesamtweg berechnet. $c_{ij}\quad (i, j)\i
 $$\text{min}\quad\sum_{i \in V}\sum_{j \in V}c_{ij} x_{ij}\tag{5}$$
 
 Im Quelltext sind diese Beschränkungen in [linearisierter](https://download.aimms.com/aimms/download/manuals/AIMMS3OM_IntegerProgrammingTricks.pdf) Form zu finden.
-Das Programm ist in der Sprache Python umgesetzt und ab der Version `3.6` ausführbar. Zur Lösung wird die von Google entwicklete Bibliothek `ortools` neben einigen anderen Paketen verwendet, die mit `pip install -r requirements.txt` installiert werden können. Das Programm erstellt das ILP-Modell, sucht dann mit einem Zeitlimit von 3 Minuten nach einer Lösung und gibt diese aus. Zusätzlich zu einer graphischen Darstellung mithilfe von `networkx` und `pyplot` werden in der Datei `output/wenigerkrumm{}.txt` die Koordinaten ausgegeben, die Anton in sein Navi eingeben muss. Da der Pfad in beide Richtungen abgefahren werden kann, ist es egal ob er am Ende oder Anfang der Datei anfängt.
+Das Programm ist in der Sprache Python umgesetzt und ab der Version `3.6` ausführbar. Zur Lösung wird die von Google entwicklete Bibliothek [`ortools`](https://developers.google.com/optimization) neben einigen anderen Paketen verwendet, die mit `pip install -r requirements.txt` installiert werden können. Das Programm erstellt das ILP-Modell, sucht dann mit einem Zeitlimit von 3 Minuten nach einer Lösung und gibt diese aus. Zusätzlich zu einer graphischen Darstellung mithilfe von `networkx` und `pyplot` werden in der Datei `output/wenigerkrumm{}.txt` die Koordinaten ausgegeben, die Anton in sein Navi eingeben muss. Da der Pfad in beide Richtungen abgefahren werden kann, ist es egal ob er am Ende oder Anfang der Datei anfängt.
 
 ### Verbesserungen
 

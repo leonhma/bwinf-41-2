@@ -46,3 +46,5 @@ mehrere lösungsansätze
 verbesserungen und deren schwierigkeiten
 
 kleinere knotenpunkte in samples
+
+run pipreqs
