@@ -74,16 +74,21 @@ def main(stack: List[Tuple[int, int]]):
         # if next_neighbors is none, generate them (calculate new size and check for fit and seen)
         if to_check is None:
             to_check = set()
+            seen_sizes = set()
             for i in get_neighbors(current):
                 if i in seen:
                     continue
                 ab = set(stack[i])
+                new_size = None
                 if ab == set(size[:2]):
-                    to_check.add((i, (size[0], size[1], size[2] + 1)))
+                    new_size = tuple(sorted((size[0], size[1], size[2] + 1)))
                 elif ab == set(size[1:]):
-                    to_check.add((i, (size[1], size[2], size[0] + 1)))
+                    new_size = tuple(sorted((size[1], size[2], size[0] + 1)))
                 elif ab == set(size[::2]):
-                    to_check.add((i, (size[2], size[0], size[1] + 1)))
+                    new_size = tuple(sorted((size[2], size[0], size[1] + 1)))
+                if new_size is not None and new_size not in seen_sizes:
+                    seen_sizes.add(new_size)
+                    to_check.add((i, new_size))
         # if neighbors is empty or none, remove current node from path and seen
         # happens if a deadend is encountered
         if not to_check:
