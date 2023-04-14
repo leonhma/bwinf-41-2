@@ -68,7 +68,8 @@ def main(points: List[Tuple[float, float]], fname: str):
     if not solver:
         raise ExitException('Fehler beim Erstellen des Solvers. '
                             '(Ist die richtige Version von ortools installiert?)')
-    solver.SetTimeLimit(SOLVER_MAX_TIME * 1000)         # Maximale Berechnungszeit in Millisekunden
+    # Maximale Berechnungszeit in Millisekunden
+    solver.SetTimeLimit(SOLVER_MAX_TIME * 1000)
     solver.SetNumThreads(max(1, os.cpu_count() - 2))    # Anzahl der Threads
 
     print('\033[1A\033[2KVorberechnung der Winkel...')
@@ -88,7 +89,8 @@ def main(points: List[Tuple[float, float]], fname: str):
         if i != j:
             x[i, j] = solver.BoolVar(f'x_{i}_{j}')
     # Erstellen von Subtour-Eliminierungs-Variablen
-    t = {i: solver.IntVar(0, len(points) - 1, f't_{i}') for i in range(len(points))}
+    t = {i: solver.IntVar(0, len(points) - 1, f't_{i}')
+         for i in range(len(points))}
     # Erstellen von Winkel-Upper-Bound Variable
     angle_ub = solver.IntVar(0, ANGLE_UPPER_BOUND, 'angle_ub')
 
@@ -110,10 +112,13 @@ def main(points: List[Tuple[float, float]], fname: str):
     # angle_ub ist >= dem größten Winkel im Pfad
     for i, j, k in a:
         if i < k and (i, j) in x and (j, k) in x:
-            solver.Add(a[i, j, k] <= angle_ub + 180 * (1 - x[i, j]) + 180 * (1 - x[j, k]))
-            solver.Add(a[i, j, k] <= angle_ub + 180 * (1 - x[k, j]) + 180 * (1 - x[j, i]))
+            solver.Add(a[i, j, k] <= angle_ub + 180 *
+                       (1 - x[i, j]) + 180 * (1 - x[j, k]))
+            solver.Add(a[i, j, k] <= angle_ub + 180 *
+                       (1 - x[k, j]) + 180 * (1 - x[j, i]))
 
-    print(f'\033[1A\033[2K\033[1AAnzahl der Bedingungen: {solver.NumConstraints()}\n')
+    print(
+        f'\033[1A\033[2K\033[1AAnzahl der Bedingungen: {solver.NumConstraints()}\n')
 
     # Erstellen der Kostenfunktion
     print('Erstelle Ziel...')
@@ -125,7 +130,8 @@ def main(points: List[Tuple[float, float]], fname: str):
             objective.SetCoefficient(x[i, j], dist)
             objective.SetCoefficient(x[j, i], dist)
     # angle_ub wird als Kostenfaktor hinzugefügt
-    objective.SetCoefficient(angle_ub, avg_arc_cost * len(points) * ANGLE_COST_FACTOR)
+    objective.SetCoefficient(angle_ub, avg_arc_cost *
+                             len(points) * ANGLE_COST_FACTOR)
     objective.SetMinimization()
 
     # Lösung finden
@@ -162,7 +168,8 @@ def main(points: List[Tuple[float, float]], fname: str):
                 length += distance(points[i], points[j])
 
         # Ausgabe der Lösung als Datei
-        Path(os.path.join(os.path.dirname(__file__), 'output')).mkdir(parents=True, exist_ok=True)
+        Path(os.path.join(os.path.dirname(__file__), 'output')).mkdir(
+            parents=True, exist_ok=True)
         with open(os.path.join(os.path.dirname(__file__), f'output/{fname}'), 'w') as f:
             for node in nx.shortest_path(G, end_nodes[0], end_nodes[1]):
                 coords = points[node]
@@ -183,7 +190,8 @@ def main(points: List[Tuple[float, float]], fname: str):
                     G.nodes[node]['color'] = 'r'
 
         ax = plt.gca()
-        ax.set_aspect('equal')  # Damit die x- und y-Achsen gleich skaliert werden
+        # Damit die x- und y-Achsen gleich skaliert werden
+        ax.set_aspect('equal')
         plt.get_current_fig_manager().set_window_title(f'{fname[:-4]}')
 
         pos = nx.get_node_attributes(G, 'pos')
@@ -211,7 +219,8 @@ if __name__ == '__main__':
                 fname = f'wenigerkrumm{input("Bitte Zahl des Beispiels eingeben: ")}.txt'
                 points = []
                 with open(os.path.join(os.path.dirname(__file__), f'beispieldaten/{fname}')) as f:
-                    points = [tuple(map(float, line.split())) for line in f.readlines()]
+                    points = [tuple(map(float, line.split()))
+                              for line in f.readlines()]
                 main(tuple(points), fname)
             except Exception as e:
                 print(e)

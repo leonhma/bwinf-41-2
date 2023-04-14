@@ -6,7 +6,8 @@ from alive_progress import alive_it
 from prog import main
 
 for _ in alive_it(range(1000)):
-    sizei = [random.randint(1, 10), random.randint(1, 10), random.randint(1, 10)]
+    sizei = [random.randint(1, 10), random.randint(
+        1, 10), random.randint(1, 10)]
     size = sizei.copy()
     slices = []
 
