@@ -25,7 +25,7 @@ bsp7 "langer anruf"
 
 ---
 
-[X] verify solutions
+verify solutions
 
 ---
 
@@ -45,7 +45,7 @@ IDEAS
 
 run pipreqs
 
-start node can't be missing
+TODO currently start node can't be missing
 
 ---
 
@@ -57,10 +57,6 @@ prefer solutions that don't add slices
 
 ---
 
-filter first nodes to be unique in size
-
----
-
 ignore new paths using virtual nodes if a path without can be found
 
-TODO add tracking of 'virtual' nodes
+TODO add return of 'virtual' nodes

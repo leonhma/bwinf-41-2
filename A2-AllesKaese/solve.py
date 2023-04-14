@@ -80,22 +80,22 @@ def vanilla(stack: List[Tuple[int, int]]) -> Tuple:
         path.append([next_[0], next_[1], None])
 
 
-def covers(it1, it2) -> Tuple | bool:
+def covers(it1, it2) -> Tuple | None:
     it1_ = tuple(sorted(it1))
     masks = ((0, 0), (0, 1), (1, 0))
     for mask in masks:
         if tuple(sorted(map(lambda x: x[0] + x[1], zip(it2, mask)))) == it1_:
-            print('returning', mask)
+            print("returning", mask)
             return mask
 
 
 def create_virtual(ab: List, mask: Tuple, ignoredsize: int) -> Tuple or None:
     """Erstellt eine virtuelle Scheibe aus einer Scheibe und einer Maske."""
-    if not any(mask):   # no need to create virtual
+    if not any(mask):  # no need to create virtual
         return
 
-    print('adding virtual', ab, mask)
-    return (1, ignoredsize, ab[mask.index(0)])
+    print("adding virtual", ab, mask)
+    return (ignoredsize, ab[mask.index(0)])
 
 
 # pylama:ignore=C901
@@ -134,6 +134,8 @@ def search(stack: List[Tuple[int, int]]):
     seen = set()
     # Besuchter Pfad mit Größe und zu prüfenden Nachbarn (für backtracking)
     path = []
+    # Anzahl der hinzugefügten 'aufgegessenen' Scheiben
+    n_virtual = 0
 
     while True:
         # Wenn kein Pfad existiert, wähle einen Startknoten
@@ -143,9 +145,14 @@ def search(stack: List[Tuple[int, int]]):
                 path = [[0, start, tuple(stack[start] + (1,)), None]]
                 continue
             # Wenn keine Startknoten mehr existieren, sind alle Lösungen gefunden
-            return solutions.items()
+            for path, size, n_virtual in solutions.values():
+                yield (path, size, n_virtual)
+            return
         # Aktueller Knoten, Größe und zu prüfende Nachbarn, und eingefügte 'aufgegessene' Scheiben
-        _, current, size, to_check = path[-1]
+        try:
+            _, current, size, to_check = path[-1]
+        except TypeError:
+            print("error: path[-1] is", path[-1])
         print("current path is", path)
         # Füge den aktuellen Knoten zu den besuchten Knoten hinzu
         seen.add(current)
@@ -161,15 +168,24 @@ def search(stack: List[Tuple[int, int]]):
                 ab = list(stack[i])
                 if s := covers(ab, size[:2]):
                     new_sizes.add(
-                        (tuple(sorted(ab + [size[2] + 1])), create_virtual(ab, s, size[2]))
+                        (
+                            tuple(sorted(ab + [size[2] + 1])),
+                            create_virtual(ab, s, size[2]),
+                        )
                     )
                 if s := covers(ab, size[1:]):
                     new_sizes.add(
-                        (tuple(sorted(ab + [size[0] + 1])), create_virtual(ab, s, size[0]))
+                        (
+                            tuple(sorted(ab + [size[0] + 1])),
+                            create_virtual(ab, s, size[0]),
+                        )
                     )
                 if s := covers(ab, size[::2]):
                     new_sizes.add(
-                        (tuple(sorted(ab + [size[1] + 1])), create_virtual(ab, s, size[1]))
+                        (
+                            tuple(sorted(ab + [size[1] + 1])),
+                            create_virtual(ab, s, size[1]),
+                        )
                     )
                 for new_size, virtual in new_sizes:
                     if new_size not in seen_sizes:
@@ -180,10 +196,15 @@ def search(stack: List[Tuple[int, int]]):
         path[-1][3] = to_check
         # Wenn es keine Nachbarn gibt -> backtracking
         if not to_check:
-            path_ = tuple(map(lambda x: x[1], filter(lambda x: not x[0], path)))
+            filteredpath_ = tuple(map(lambda x: x[1], filter(lambda x: not x[0], path)))
+            path_ = tuple(map(lambda x: x[1], path))
             print(f"returning {path_}")
-            solutions[path_] = min(
-                (size, solutions.get(path_, size)), key=lambda x: sum(x)
+            solutions[filteredpath_] = min(
+                (
+                    (path_, size, n_virtual),
+                    solutions.get(path_, (path_, size, n_virtual)),
+                ),
+                key=lambda x: sum(x[1]) * x[2],
             )
             while path and not path[-1][3]:
                 i = path.pop()[1]
@@ -191,6 +212,7 @@ def search(stack: List[Tuple[int, int]]):
                 # remove virtual
                 if path and path[-1][0] == 1:
                     path.pop()
+                    n_virtual -= 1
             continue
 
         # Der nächste Knoten ist der erste Nachbar, der noch nicht besucht wurde
@@ -198,9 +220,10 @@ def search(stack: List[Tuple[int, int]]):
         next_node, next_size, next_to_check, virtual = next_
         if virtual:
             path.append([1, virtual])  # 1, virtual size
+            n_virtual += 1
         path.append([0, next_node, next_size, next_to_check])
 
 
 def make_stacks(n: int):
-    # run through all solutions in complex and check if make_stacks(n-1) of the rest is possible
+    # run through all solutions in search and check if make_stacks(n-1) of the rest is possible
     pass
