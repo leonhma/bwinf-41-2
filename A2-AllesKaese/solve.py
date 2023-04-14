@@ -85,7 +85,6 @@ def covers(it1, it2) -> Tuple | None:
     masks = ((0, 0), (0, 1), (1, 0))
     for mask in masks:
         if tuple(sorted(map(lambda x: x[0] + x[1], zip(it2, mask)))) == it1_:
-            print("returning", mask)
             return mask
 
 
@@ -94,7 +93,6 @@ def create_virtual(ab: List, mask: Tuple, ignoredsize: int) -> Tuple or None:
     if not any(mask):  # no need to create virtual
         return
 
-    print("adding virtual", ab, mask)
     return (ignoredsize, ab[mask.index(0)])
 
 
@@ -149,11 +147,7 @@ def search(stack: List[Tuple[int, int]]):
                 yield (path, size, n_virtual)
             return
         # Aktueller Knoten, Größe und zu prüfende Nachbarn, und eingefügte 'aufgegessene' Scheiben
-        try:
-            _, current, size, to_check = path[-1]
-        except TypeError:
-            print("error: path[-1] is", path[-1])
-        print("current path is", path)
+        _, current, size, to_check = path[-1]
         # Füge den aktuellen Knoten zu den besuchten Knoten hinzu
         seen.add(current)
         # Wenn noch keine Nachbarn geprüft wurden, generiere sie
@@ -198,7 +192,6 @@ def search(stack: List[Tuple[int, int]]):
         if not to_check:
             filteredpath_ = tuple(map(lambda x: x[1], filter(lambda x: not x[0], path)))
             path_ = tuple(map(lambda x: x[1], path))
-            print(f"returning {path_}")
             solutions[filteredpath_] = min(
                 (
                     (path_, size, n_virtual),
