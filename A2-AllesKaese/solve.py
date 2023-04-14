@@ -89,22 +89,13 @@ def covers(it1, it2) -> Tuple | bool:
             return mask
 
 
-def create_virtual(size: List, partial_mask: Tuple, ignored_dim: int) -> Tuple or None:
+def create_virtual(ab: List, mask: Tuple, ignoredsize: int) -> Tuple or None:
     """Erstellt eine virtuelle Scheibe aus einer Scheibe und einer Maske."""
-    mask = []
-    removed = 0
-    for i in range(3):
-        if i == ignored_dim:
-            mask.append(0)
-            removed = 1
-        else:
-            mask.append(partial_mask[i - removed])
-
-    if not any(mask):
+    if not any(mask):   # no need to create virtual
         return
 
-    print('adding virtual', size, mask)
-    return tuple(sorted(map(lambda x: x[0] if not x[1] else 1, zip(size, mask))))
+    print('adding virtual', ab, mask)
+    return (1, ignoredsize, ab[mask.index(0)])
 
 
 # pylama:ignore=C901
@@ -170,15 +161,15 @@ def search(stack: List[Tuple[int, int]]):
                 ab = list(stack[i])
                 if s := covers(ab, size[:2]):
                     new_sizes.add(
-                        (tuple(sorted(ab + [size[2] + 1])), create_virtual(size, s, 2))
+                        (tuple(sorted(ab + [size[2] + 1])), create_virtual(ab, s, size[2]))
                     )
                 if s := covers(ab, size[1:]):
                     new_sizes.add(
-                        (tuple(sorted(ab + [size[0] + 1])), create_virtual(size, s, 0))
+                        (tuple(sorted(ab + [size[0] + 1])), create_virtual(ab, s, size[0]))
                     )
                 if s := covers(ab, size[::2]):
                     new_sizes.add(
-                        (tuple(sorted(ab + [size[1] + 1])), create_virtual(size, s, 1))
+                        (tuple(sorted(ab + [size[1] + 1])), create_virtual(ab, s, size[1]))
                     )
                 for new_size, virtual in new_sizes:
                     if new_size not in seen_sizes:
