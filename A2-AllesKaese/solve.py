@@ -1,12 +1,11 @@
 import collections
-import time
+import itertools
 from typing import List, Set, Tuple
 
 
 # pylama:ignore=C901
 def vanilla(stack: List[Tuple[int, int]]) -> Tuple:
     """Lösen des Problems mit vollständigem Käsestack und einem Startkäse."""
-    start_time = time.time()
 
     # Hashmap für schnellen Zugriff auf potentielle Nachbarn
     lookup = collections.defaultdict(set)
@@ -35,18 +34,18 @@ def vanilla(stack: List[Tuple[int, int]]) -> Tuple:
                 start = start_nodes_i.pop(0)
                 path = [[start, tuple(stack[start] + (1,)), None]]
                 continue
-            # Wenn keine Startknoten mehr existieren, ist keine Lösung möglich
-            raise Exception("no solution found")
+            else:
+                # Es kann keine Lösung gefunden werden
+                return
         # Aktueller Knoten, Größe und zu prüfende Nachbarn
         current, size, to_check = path[-1]
         # Füge den aktuellen Knoten zu den besuchten Knoten hinzu
         seen.add(current)
         # Wenn der Pfad vollständig ist, wurde eine Lösung gefunden
         if len(seen) == len(stack):
-            return (
-                list(map(lambda x: stack[x[0]], path)),
-                size,
-                time.time() - start_time,
+            return ((
+                list(map(lambda x: x[0], path)),
+                size, 0),
             )
         # Wenn noch keine Nachbarn geprüft wurden, generiere sie
         if to_check is None:
@@ -94,6 +93,18 @@ def create_virtual(ab: List, mask: Tuple, ignoredsize: int) -> Tuple or None:
         return
 
     return (ignoredsize, ab[mask.index(0)])
+
+
+def remove(slice: Tuple[int, int], size: List[int]):
+    ab = set(slice)
+    if ab == set(size[:2]):
+        size[2] -= 1
+    elif ab == set(size[1:]):
+        size[0] -= 1
+    elif ab == set(size[::2]):
+        size[1] -= 1
+    else:
+        raise Exception('what')
 
 
 # pylama:ignore=C901
@@ -217,6 +228,36 @@ def search(stack: List[Tuple[int, int]]):
         path.append([0, next_node, next_size, next_to_check])
 
 
-def make_stacks(n: int):
-    # run through all solutions in search and check if make_stacks(n-1) of the rest is possible
-    pass
+def make_stacks(stack: List[Tuple[int, int]], n: int):
+    for c in itertools.combinations(search(stack), n):
+        overflow = sum(x[3] for x in c) - len(stack)
+        if overflow < 0:
+            continue
+        for x in itertools.product(range(overflow + 1), repeat=n):
+            if sum(x) != overflow:
+                continue
+            try:
+                paths = []
+                for i, p in enumerate(c):
+                    path, size, n_virtual = list(p[0]), list(p[1]), p[2]
+                    for _ in range(x[i]):
+                        i = path.pop()
+                        remove(stack[i], size)
+                        if path and isinstance(path[-1], tuple):
+                            s = path.pop()
+                            remove(s, size)
+                            n_virtual -= 1
+
+                    paths.append((tuple(path), tuple(size), n_virtual))
+            except IndexError:
+                continue
+            if any(len(p) == 0 for p, _, _ in paths):
+                continue
+            seen = set()
+            for p, _, _ in paths:
+                for i in p:
+                    if isinstance(i, tuple):
+                        continue
+                    seen.add(i)
+            if len(seen) == len(stack):
+                yield tuple(paths)
