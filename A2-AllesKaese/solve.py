@@ -143,8 +143,8 @@ def search(stack: List[Tuple[int, int]]):
                 path = [[0, start, tuple(stack[start] + (1,)), None]]
                 continue
             # Wenn keine Startknoten mehr existieren, sind alle Lösungen gefunden
-            for path, size, n_virtual in solutions.values():
-                yield (path, size, n_virtual)
+            for path, size, n_virtual, n_nodes in solutions.values():
+                yield (path, size, n_virtual, n_nodes)
             return
         # Aktueller Knoten, Größe und zu prüfende Nachbarn, und eingefügte 'aufgegessene' Scheiben
         _, current, size, to_check = path[-1]
@@ -194,8 +194,8 @@ def search(stack: List[Tuple[int, int]]):
             path_ = tuple(map(lambda x: x[1], path))
             solutions[filteredpath_] = min(
                 (
-                    (path_, size, n_virtual),
-                    solutions.get(path_, (path_, size, n_virtual)),
+                    (path_, size, n_virtual, len(seen)),
+                    solutions.get(path_, (path_, size, n_virtual, len(seen))),
                 ),
                 key=lambda x: sum(x[1]) * x[2],
             )
