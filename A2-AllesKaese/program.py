@@ -14,7 +14,8 @@ if __name__ == "__main__":
     try:
         while True:
             try:
-                fname = f'kaese{input("Bitte Zahl des Beispiels eingeben: ")}.txt'
+                num = int(input("Bitte Zahl des Beispiels eingeben: "))
+                fname = f"kaese{num}.txt"
                 start_time = time.time()
                 print()
                 print(f"Lade {fname}...")
@@ -31,8 +32,6 @@ if __name__ == "__main__":
                 try:
                     print("Löse Problem...")
                     res = vanilla(stack)
-                # except Exception as e:
-                #     print(f"Fehler: {e}\n")
                 finally:
                     print("\033[1A\033[2K", end="")
 
@@ -42,24 +41,21 @@ if __name__ == "__main__":
                             "Keine Lösung für einfaches Problem gefunden. "
                             "Verwende erweitertes Problem..."
                         )
-                        for i in range(1, 2):       # len(stack)
+                        for i in range(1, len(stack) + 1):
                             results = list(make_stacks(stack, i))
-                            print(f'len of results for {i} is {len(results)}')
                             if len(results) == 0:
                                 continue
                             results.sort(key=lambda x: sum(y[2] for y in x))
                             res = results[0]
                             break
                         easy = False
-                    # except Exception as e:
-                    #     print(f"Fehler: {e}\n\n")
                     finally:
                         print("\033[1A\033[2K", end="")
 
                 if res is None or len(res) == 0:
                     raise Exception("Keine Lösung gefunden.")
 
-                if easy:  # Einfaches Problem
+                if num in tuple(range(1, 8)):  # Einfaches Problem
                     path, size, n_virtual = res[0]
 
                     # Ausgabe der Lösung als Datei
@@ -73,10 +69,13 @@ if __name__ == "__main__":
                             f.write(f"{stack[slice][0]} {stack[slice][1]}\n")
 
                     print(f"Zeit: {time.time()-start_time:.2f}s")
-                    print("Käseblöcke: 1")
                     print("Reihenfolge: ", end="")
                     if len(path) < 100:
-                        print(" -> ".join(map(lambda x: f"{stack[x][0]}x{stack[x][1]}", path)))
+                        print(
+                            " -> ".join(
+                                map(lambda x: f"{stack[x][0]}x{stack[x][1]}", path)
+                            )
+                        )
                     else:
                         print(
                             f"Zu groß für die Konsole ({len(path)} Stück). Siehe output/{fname}."
@@ -96,14 +95,16 @@ if __name__ == "__main__":
                             else:
                                 started = True
                             if isinstance(slice, tuple):
-                                print(f"{slice[0]}x{slice[1]} (wurde aufgegessen)", end="")
+                                print(
+                                    f"{slice[0]}x{slice[1]} (wurde aufgegessen)", end=""
+                                )
                             else:
                                 print(f"{stack[slice][0]}x{stack[slice][1]}", end="")
                         print()
                         print(f"Größe: {size[0]}x{size[1]}x{size[2]}")
                         print(f"Anzahl aufgegessener Scheiben: {n_virtual}")
-            # except Exception as e:
-            #     print(f"Fehler: {e}")
+            except Exception as e:
+                print(f"Fehler: {e}")
             finally:
                 print()
     except ExitException as e:

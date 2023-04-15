@@ -60,3 +60,7 @@ prefer solutions that don't add slices
 ignore new paths using virtual nodes if a path without can be found
 
 TODO add return of 'virtual' nodes
+
+---
+
+kaese9 testet beschränkung der beispiellänge

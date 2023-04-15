@@ -9,9 +9,14 @@ def vanilla(stack: List[Tuple[int, int]]) -> Tuple:
 
     # Hashmap für schnellen Zugriff auf potentielle Nachbarn
     lookup = collections.defaultdict(set)
-    for i, (a, b) in enumerate(stack):
-        lookup[a].add(i)
-        lookup[b].add(i)
+    try:
+        for i, (a, b) in enumerate(stack):
+            lookup[a].add(i)
+            lookup[b].add(i)
+    except ValueError:
+        raise Exception(
+            "ValueError: Die Eingabe-Datei ist wahrscheinlich nicht korrekt formatiert."
+        )
 
     # Funktion zum Zugriff auf potentielle Nachbarn
     def get_neighbors(i: int) -> Set[int]:
@@ -43,10 +48,7 @@ def vanilla(stack: List[Tuple[int, int]]) -> Tuple:
         seen.add(current)
         # Wenn der Pfad vollständig ist, wurde eine Lösung gefunden
         if len(seen) == len(stack):
-            return ((
-                list(map(lambda x: x[0], path)),
-                size, 0),
-            )
+            return ((list(map(lambda x: x[0], path)), size, 0),)
         # Wenn noch keine Nachbarn geprüft wurden, generiere sie
         if to_check is None:
             to_check = set()  # Set für mögliche Nachbarn
@@ -104,13 +106,13 @@ def remove(slice: Tuple[int, int], size: List[int]):
     elif ab == set(size[::2]):
         size[1] -= 1
     else:
-        raise Exception('what')
+        raise Exception("what")
 
 
 # pylama:ignore=C901
 # step through solutions to the problem (includes missing cheese).
 # Return a solution before backtracking starts
-def search(stack: List[Tuple[int, int]]):
+def fuzzy(stack: List[Tuple[int, int]]):
     """Lösen des Problems mit fehlerhaftem Käsestack und mehreren Käseblöcken."""
 
     # Dictionary der Lösungen und ihrer Größe
@@ -196,6 +198,8 @@ def search(stack: List[Tuple[int, int]]):
                     if new_size not in seen_sizes:
                         seen_sizes.add(new_size)
                         # Füge den Nachbarn zu den zu prüfenden Nachbarn hinzu
+                        if virtual and sorted(virtual) == sorted(stack[i]):
+                            virtual = None
                         to_check.add((i, new_size, None, virtual))
         # Aktualisiere die zu prüfenden Nachbarn im Pfad
         path[-1][3] = to_check
@@ -229,7 +233,7 @@ def search(stack: List[Tuple[int, int]]):
 
 
 def make_stacks(stack: List[Tuple[int, int]], n: int):
-    for c in itertools.combinations(search(stack), n):
+    for c in itertools.combinations(fuzzy(stack), n):
         overflow = sum(x[3] for x in c) - len(stack)
         if overflow < 0:
             continue
