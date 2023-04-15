@@ -1,7 +1,7 @@
 import collections
 import itertools
 from typing import List, Set, Tuple
-import functools
+
 
 # pylama:ignore=C901
 def vanilla(stack: List[Tuple[int, int]]) -> Tuple:
@@ -39,6 +39,8 @@ def vanilla(stack: List[Tuple[int, int]]) -> Tuple:
     seen = set()
     # Besuchter Pfad mit Größe und zu prüfenden Nachbarn (für backtracking)
     path = []
+    avg_n_neigh = 0
+    avg_n_neigh_n = 0
     while True:
         # Wenn kein Pfad existiert, wähle einen Startknoten
         if not path:
@@ -82,6 +84,9 @@ def vanilla(stack: List[Tuple[int, int]]) -> Tuple:
             path.pop()
             seen.remove(current)
             continue
+        else:
+            avg_n_neigh += len(to_check)
+            avg_n_neigh_n += 1
         # Aktualisiere die zu prüfenden Nachbarn im Pfad
         # (nötig wenn die Nachbarn gerade generiert wurden)
         path[-1][2] = to_check

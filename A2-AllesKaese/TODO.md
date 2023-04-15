@@ -25,7 +25,7 @@ bsp7 "langer anruf"
 
 ---
 
-verify solutions
+verify solutions include script
 
 ---
 

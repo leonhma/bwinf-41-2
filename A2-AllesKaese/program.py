@@ -44,7 +44,7 @@ if __name__ == "__main__":
                     try:
                         print(
                             "Keine Lösung für einfaches Problem gefunden. "
-                            "Verwende erweitertes Problem...\n\n"
+                            "Verwende erweitertes Problem..."
                         )
                         # Immer mehr Käseblöcke erlauben, bis maximal zur Länge des Stacks
                         for i in range(1, len(stack) + 1):
@@ -80,7 +80,7 @@ if __name__ == "__main__":
                     # Ausgabe von Lösungswerten
                     print(f"Zeit: {time.time()-start_time:.2f}s")
                     print("Reihenfolge: ", end="")
-                    if len(path) < 100:
+                    if len(path) < 10:
                         print(
                             " -> ".join(
                                 map(lambda x: f"{stack[x][0]}x{stack[x][1]}", path)
@@ -115,8 +115,8 @@ if __name__ == "__main__":
                         print(f"Größe: {size[0]}x{size[1]}x{size[2]}")
                         print(f"Anzahl aufgegessener Scheiben: {n_virtual}")
             # Fehlerbehandlung
-            # except Exception as e:
-            #     print(f"Fehler: {e}")
+            except Exception as e:
+                print(f"Fehler: {e}")
             finally:
                 print()
     except ExitException as e:

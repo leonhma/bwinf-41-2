@@ -20,6 +20,7 @@ Nun gilt es als Lösung einen Hamilton-Pfad $L(V, E_L)$ zu konstruieren, der die
 Zusätzlich dazu müssen auch noch die Vorgaben aus der Aufgabenstellung (keine Abbiegewinkel über $90°$ und die Minimierung der Strecke) beachtet werden.
 
 Für eine arbiträre Liste von Außenstellen und deren Koordinaten kann nicht immer eine Lösung gefunden werden. Das Liegt daran dass es sein kann, dass eine Außenstelle keine zwei Nachbaren hat, mit denen sie einen Abbiegewinkel unter $90°$ bilden kann. Hier ein Beispiel:
+
 ![Darstellung von Punkten die keinen Pfad nach Aufgabenbeschreibung zulassen](./static/illegal_turn.png)
 
 Wie man sieht kann hier (leicht überprüfbar) kein Pfad gefunden werden, der die verlangten Anforderungen erfüllt.
@@ -63,7 +64,9 @@ SOLVER_MAX_TIME = 60 * 3    # 3 Minuten Berechnungszeit
 
 #### Maximaler Winkel
 
-Anton hat ein neues Gefährt bekommen! Jetzt kann er Abbiegewinkel von `110°` meistern. In den Parametern kann auch der maximale Abbiegewinkel angepasst werden (`ANGLE_UPPER_BOUND`).
+Anton hat ein neues Gefährt bekommen! Jetzt kann er Abbiegewinkel von `110°` meistern. In den Parametern kann auch der maximale Abbiegewinkel angepasst werden (`ANGLE_UPPER_BOUND`). Hier Beispiel 5 mit einem `ANGLE_UPPER_BOUND` von `110`. So kann in `36.91s` eine optimale Strecke mit Weglänge `2860.31km` gefunden werden.
+
+![größere Winkel](./static/5-110deg.png)
 
 #### Abbiegewinkel-Minimierung
 
@@ -414,8 +417,8 @@ import networkx as nx
 from ortools.linear_solver import pywraplp
 
 ANGLE_UPPER_BOUND = 90
-ANGLE_COST_FACTOR = 0        # 0.002
-SOLVER_MAX_TIME = 60 * 20    # 3 Minuten Berechnungszeit
+ANGLE_COST_FACTOR = 0  # 0.002
+SOLVER_MAX_TIME = 60 * 20  # 3 Minuten Berechnungszeit
 
 
 class ExitException(BaseException):
@@ -453,9 +456,8 @@ def distance(p1: Tuple[int, int], p2: Tuple[int, int]) -> float:
 
 # pylama:ignore=C901
 def main(points: List[Tuple[float, float]], fname: str):
-
     print()
-    print('Berechne ungefähren Mittelwert der Kantenlängen...')
+    print("Berechne ungefähren Mittelwert der Kantenlängen...")
     # Berechnung eines ungefähren Mittelwerts für die Kantenlängen,
     # für die Verwendung in der Kostengleichung
     avg_arc_cost = 0
@@ -466,40 +468,45 @@ def main(points: List[Tuple[float, float]], fname: str):
         avg_arc_n += 1
     avg_arc_cost /= avg_arc_n
 
-    print('\033[1A\033[2KErstelle Solver...')
-    solver = pywraplp.Solver.CreateSolver('CP_SAT')
+    print("\033[1A\033[2KErstelle Solver...")
+    solver = pywraplp.Solver.CreateSolver("CP_SAT")
     if not solver:
-        raise ExitException('Fehler beim Erstellen des Solvers. '
-                            '(Ist die richtige Version von ortools installiert?)')
+        raise ExitException(
+            "Fehler beim Erstellen des Solvers. "
+            "(Ist die richtige Version von ortools installiert?)"
+        )
     # Maximale Berechnungszeit in Millisekunden
     solver.SetTimeLimit(SOLVER_MAX_TIME * 1000)
-    solver.SetNumThreads(max(1, os.cpu_count() - 2))    # Anzahl der Threads
+    solver.SetNumThreads(max(1, os.cpu_count() - 2))  # Anzahl der Threads
 
-    print('\033[1A\033[2KVorberechnung der Winkel...')
+    print("\033[1A\033[2KVorberechnung der Winkel...")
     # Winkel-Matrix berechnen
     a = {}
     for i, j, k in itertools.permutations(range(-1, len(points)), 3):
         if i < k and j not in (i, k):
-            if -1 in (i, j, k):  # winkel beinhaltet den 'unsichbaren' Start- / Endknoten
+            if -1 in (
+                i,
+                j,
+                k,
+            ):  # winkel beinhaltet den 'unsichbaren' Start- / Endknoten
                 a[i, j, k] = 0
             else:
                 a[i, j, k] = angle(points[i], points[j], points[k])
 
-    print('\033[1A\033[2KErstelle Variablen...')
+    print("\033[1A\033[2KErstelle Variablen...")
     # 2d-Binärmatrix für die Kanten
     x = {}
     for i, j in itertools.permutations(range(-1, len(points)), 2):
         if i != j:
-            x[i, j] = solver.BoolVar(f'x_{i}_{j}')
+            x[i, j] = solver.BoolVar(f"x_{i}_{j}")
     # Erstellen von Subtour-Eliminierungs-Variablen
-    t = {i: solver.IntVar(0, len(points) - 1, f't_{i}')
-         for i in range(len(points))}
+    t = {i: solver.IntVar(0, len(points) - 1, f"t_{i}") for i in range(len(points))}
     # Erstellen von Winkel-Upper-Bound Variable
-    angle_ub = solver.IntVar(0, ANGLE_UPPER_BOUND, 'angle_ub')
+    angle_ub = solver.IntVar(0, ANGLE_UPPER_BOUND, "angle_ub")
 
-    print(f'\033[1A\033[2KAnzahl der Variablen: {solver.NumVariables()}\n')
+    print(f"\033[1A\033[2KAnzahl der Variablen: {solver.NumVariables()}\n")
 
-    print('Erstelle Bedingungen...')
+    print("Erstelle Bedingungen...")
     # Bedingungen für die Subtour Elimination
     for i, j in x:
         if -1 not in (i, j):
@@ -515,16 +522,17 @@ def main(points: List[Tuple[float, float]], fname: str):
     # angle_ub ist >= dem größten Winkel im Pfad
     for i, j, k in a:
         if i < k and (i, j) in x and (j, k) in x:
-            solver.Add(a[i, j, k] <= angle_ub + 180 *
-                       (1 - x[i, j]) + 180 * (1 - x[j, k]))
-            solver.Add(a[i, j, k] <= angle_ub + 180 *
-                       (1 - x[k, j]) + 180 * (1 - x[j, i]))
+            solver.Add(
+                a[i, j, k] <= angle_ub + 180 * (1 - x[i, j]) + 180 * (1 - x[j, k])
+            )
+            solver.Add(
+                a[i, j, k] <= angle_ub + 180 * (1 - x[k, j]) + 180 * (1 - x[j, i])
+            )
 
-    print(
-        f'\033[1A\033[2K\033[1AAnzahl der Bedingungen: {solver.NumConstraints()}\n')
+    print(f"\033[1A\033[2K\033[1AAnzahl der Bedingungen: {solver.NumConstraints()}\n")
 
     # Erstellen der Kostenfunktion
-    print('Erstelle Ziel...')
+    print("Erstelle Ziel...")
     objective = solver.Objective()
     for i, j in x:
         if -1 not in (i, j) and i < j:
@@ -533,21 +541,20 @@ def main(points: List[Tuple[float, float]], fname: str):
             objective.SetCoefficient(x[i, j], dist)
             objective.SetCoefficient(x[j, i], dist)
     # angle_ub wird als Kostenfaktor hinzugefügt
-    objective.SetCoefficient(angle_ub, avg_arc_cost *
-                             len(points) * ANGLE_COST_FACTOR)
+    objective.SetCoefficient(angle_ub, avg_arc_cost * len(points) * ANGLE_COST_FACTOR)
     objective.SetMinimization()
 
     # Lösung finden
-    print('\033[1A\033[2KFinde Lösung...')
+    print("\033[1A\033[2KFinde Lösung...")
     status = solver.Solve()
 
-    print('\033[1A\033[2K', end='')
+    print("\033[1A\033[2K", end="")
 
     # Lösung anzeigen
     if status == pywraplp.Solver.OPTIMAL or status == pywraplp.Solver.FEASIBLE:
         time = solver.WallTime()
         solver.VerifySolution(1e-7, True)
-        status_name = 'OPTIMAL' if status == pywraplp.Solver.OPTIMAL else 'FEASIBLE'
+        status_name = "OPTIMAL" if status == pywraplp.Solver.OPTIMAL else "FEASIBLE"
 
         # Konstruieren des Lösungs-Graphen
         G = nx.Graph()
@@ -571,18 +578,19 @@ def main(points: List[Tuple[float, float]], fname: str):
                 length += distance(points[i], points[j])
 
         # Ausgabe der Lösung als Datei
-        Path(os.path.join(os.path.dirname(__file__), 'output')).mkdir(
-            parents=True, exist_ok=True)
-        with open(os.path.join(os.path.dirname(__file__), f'output/{fname}'), 'w') as f:
+        Path(os.path.join(os.path.dirname(__file__), "output")).mkdir(
+            parents=True, exist_ok=True
+        )
+        with open(os.path.join(os.path.dirname(__file__), f"output/{fname}"), "w") as f:
             for node in nx.shortest_path(G, end_nodes[0], end_nodes[1]):
                 coords = points[node]
-                f.write(f'{coords[0]} {coords[1]}\n')
+                f.write(f"{coords[0]} {coords[1]}\n")
 
         # Ausgabe der Lösungswerte in der Konsole
-        print(f'Zeit: {time/1000:.2f}s')
-        print(f'Status: {status_name}')
-        print(f'Länge: {length:.2f}km')
-        print(f'Winkel-UB: {int(angle_ub.solution_value())}°')
+        print(f"Zeit: {time/1000:.2f}s")
+        print(f"Status: {status_name}")
+        print(f"Länge: {length:.2f}km")
+        print(f"Winkel-UB: {int(angle_ub.solution_value())}°")
 
         # Rote Farbe für Winkel > ANGLE_UPPER_BOUND
         for node in G.nodes:
@@ -590,40 +598,38 @@ def main(points: List[Tuple[float, float]], fname: str):
             if len(neighbors) == 2:
                 a, b = neighbors
                 if angle(points[a], points[node], points[b]) > ANGLE_UPPER_BOUND:
-                    G.nodes[node]['color'] = 'r'
+                    G.nodes[node]["color"] = "r"
 
         ax = plt.gca()
         # Damit die x- und y-Achsen gleich skaliert werden
-        ax.set_aspect('equal')
-        plt.get_current_fig_manager().set_window_title(f'{fname[:-4]}')
+        ax.set_aspect("equal")
+        plt.get_current_fig_manager().set_window_title(f"{fname[:-4]}")
 
-        pos = nx.get_node_attributes(G, 'pos')
-        colorsd = nx.get_node_attributes(G, 'color')
-        colors = [colorsd.get(node, 'w') for node in G.nodes]
+        pos = nx.get_node_attributes(G, "pos")
+        colorsd = nx.get_node_attributes(G, "color")
+        colors = [colorsd.get(node, "w") for node in G.nodes]
 
-        nx.draw(G,
-                pos,
-                node_size=10,
-                font_size=8,
-                node_color=colors,
-                edgecolors='k')
+        nx.draw(G, pos, node_size=10, font_size=8, node_color=colors, edgecolors="k")
 
-        plt.show()      # Anzeigen des Graphen
+        plt.show()  # Anzeigen des Graphen
     else:
-        print('Keine mögliche Lösung gefunden.')
+        print("Keine mögliche Lösung gefunden.")
     print()
 
 
 # Konsolen-Loop
-if __name__ == '__main__':
+if __name__ == "__main__":
     try:
         while True:
             try:
-                fname = f'wenigerkrumm{input("Bitte Zahl des Beispiels eingeben: ")}.txt'
+                fname = (
+                    f'wenigerkrumm{input("Bitte Zahl des Beispiels eingeben: ")}.txt'
+                )
                 points = []
-                with open(os.path.join(os.path.dirname(__file__), f'beispieldaten/{fname}')) as f:
-                    points = [tuple(map(float, line.split()))
-                              for line in f.readlines()]
+                with open(
+                    os.path.join(os.path.dirname(__file__), f"beispieldaten/{fname}")
+                ) as f:
+                    points = [tuple(map(float, line.split())) for line in f.readlines()]
                 main(tuple(points), fname)
             except Exception as e:
                 print(e)
@@ -632,7 +638,7 @@ if __name__ == '__main__':
         exit()
     except KeyboardInterrupt:
         print()
-        print('Abbruch durch Benutzer.')
+        print("Abbruch durch Benutzer.")
         exit()
 
 ```
