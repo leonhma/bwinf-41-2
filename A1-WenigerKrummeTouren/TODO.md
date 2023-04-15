@@ -21,30 +21,62 @@ https://orinanobworld.blogspot.com/2012/08/user-cuts-versus-lazy-constraints.htm
 
 objective function
 
------
+---
 
 beweis komplexität
 
+---
+
 beispiele aussagekräftig + eigene beispiele
+
+---
 
 beispiel angle_ub = 110
 
+---
+
 grenzen der berechenbarkeit fast erreicht
+
+---
 
 lp relaxation
 
+---
+
 "adjazenzmatrix"
+
+---
 
 "ungleichunge stelle sicher, dass der pfad die vorgaben erfüllt"
 
+---
+
 tatsächlicher größer winkel statt angle_ub
+
+---
 
 why use mtz and directed graph
 
+---
+
 mehrere lösungsansätze
+
+---
 
 verbesserungen und deren schwierigkeiten
 
+---
+
 kleinere knotenpunkte in samples
 
-run pipreqs
+---
+
+"Reduktion auf ILP"
+
+---
+
+add A in equations iterating over all edges
+
+---
+
+triangle inequality

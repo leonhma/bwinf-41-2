@@ -29,7 +29,7 @@ verify solutions
 
 ---
 
-"Hashmap hilft"
+reihenfolge is unique
 
 ---
 
@@ -39,28 +39,22 @@ IDEAS
 - for every node calculate the largest number of nodes that can be connected from it in one path,
   check if that number is >= the number of nodes remaining
 
-## NP-Complex
+## NP-Complex or hard?
 
 ---
 
-run pipreqs
-
-TODO currently start node can't be missing
+weniger blöcke werden bevorzugt, danach werden weniger aufgegessene scheiben bevorzugt
 
 ---
 
-fix: full solutions are duplicate because backtracking is also triggered
+kaese8 testet beschränkung der beispiellänge und aufgegessene scheiben
+9 testet 5 blöcke
+10 testet aufgegessene schieben + mehrere blöcke
 
 ---
 
-prefer solutions that don't add slices
+runnable since `3.8`
 
 ---
 
-ignore new paths using virtual nodes if a path without can be found
-
-TODO add return of 'virtual' nodes
-
----
-
-kaese9 testet beschränkung der beispiellänge
+unnötige ineffizienz entfernen

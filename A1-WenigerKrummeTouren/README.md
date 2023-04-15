@@ -26,7 +26,7 @@ Wie man sieht kann hier (leicht überprüfbar) kein Pfad gefunden werden, der di
 
 Modelliert wird diese Aufgabenstellung mit einem Integer-Linear-Programming Modell, bestehend aus einer Matrix von binären Variablen die angeben, ob zwischen zwei Knoten eine Verbindung besteht.
 
-Diese Aufgabe (die Suche nach einem optimalen Pfad) ähnelt sehr stark dem Travelling-Salesman-Problem, und teilt mit diesem auch seine Klassifizierung als NP-Schwer. Während die Suche nach einer beliebigen Lösung, die die Abiegewinkel- und Vorgaben zu den Grapheigenschaften erfüllt durch ILP auf ein SAT-Problem reduziert werden kann und somit NP-Komplett ist, ist die Suche nach einer optimalen Lösung NP-Schwer, da sich eine Lösung nicht in Polynom-Zeit verifizieren lässt. Ein ähnlicher Aufwand muss für den Beweis der Unauffindbarkeit einer möglichen Route vollbracht werden. Dieser Befindet sich als Umkehrung des vorher genannten SAT-Problems in der Klasse co-NP.
+Diese Aufgabe (die Suche nach einem möglichst kurzen Pfad) ähnelt sehr stark dem Travelling-Salesman-Problem, und teilt mit diesem auch seine Klassifizierung als NP-Schwer. Während die Suche nach einer beliebigen Lösung, die die Abiegewinkel- und Vorgaben zu den Grapheigenschaften erfüllt durch ILP auf ein SAT-Problem reduziert werden kann und somit NP-Komplett ist, ist die Suche nach einer optimalen Lösung NP-Schwer, da sich eine Lösung nicht in Polynom-Zeit verifizieren lässt. Ein ähnlicher Aufwand muss für den Beweis der Unauffindbarkeit einer möglichen Route vollbracht werden. Dieser Befindet sich als Umkehrung des vorher genannten SAT-Problems in der Klasse co-NP.
 
 ## Umsetzung
 

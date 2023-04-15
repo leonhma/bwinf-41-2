@@ -1,13 +1,13 @@
 import collections
 import itertools
 from typing import List, Set, Tuple
-import functools
+
 
 # pylama:ignore=C901
 def vanilla(stack: List[Tuple[int, int]]) -> Tuple:
     """Lösen des Problems mit vollständigem Käsestack und einem Startkäse."""
 
-    # Hashmap für schnellen Zugriff auf potentielle Nachbarn
+    # Hashmap für schnellen Zugriff auf  Nachbarn
     lookup = collections.defaultdict(set)
     try:
         for i, (a, b) in enumerate(stack):
@@ -18,10 +18,18 @@ def vanilla(stack: List[Tuple[int, int]]) -> Tuple:
             "ValueError: Die Eingabe-Datei ist wahrscheinlich nicht korrekt formatiert."
         )
 
-    # Funktion zum Zugriff auf potentielle Nachbarn
-    def get_neighbors(i: int) -> Set[int]:
-        a, b = stack[i]
-        ret = (lookup[a] | lookup[b]) - {i}
+    # Funktion zum Zugriff auf Nachbarn
+    def get_neighbors(size: Tuple[int, int, int]) -> Set[Tuple[int, Tuple[int, int, int]]]:
+        ret = list()
+        res = collections.defaultdict(list)
+        for i, x in enumerate(size):
+            for next_ in lookup[x]:
+                res[next_].append(i)
+        for next_, dims in res.items():
+            if len(dims) >= 2:
+                new_size = list(size)
+                new_size[(set(range(3)).difference(dims[:2])).pop()] += 1
+                ret.append((next_, tuple(new_size)))
         return ret
 
     # Liste der Start-Scheiben (sortiert nach Größe, dedupliziert nach Größe)
@@ -59,24 +67,14 @@ def vanilla(stack: List[Tuple[int, int]]) -> Tuple:
         # Wenn noch keine Nachbarn geprüft wurden, generiere sie
         if to_check is None:
             to_check = set()  # Set für mögliche Nachbarn
-            seen_sizes = set()  # Set für bereits besuchte Größen
-            for i in get_neighbors(current):
-                if i in seen:  # Nachbarn, die bereits besucht wurden, überspringen
-                    continue
-                ab = set(stack[i])
-                new_size = None
-                # Prüfe, ob die Nachbarn die gleiche Größe (in 2 Dimensionen) haben
-                if ab == set(size[:2]):
-                    new_size = tuple(sorted((size[0], size[1], size[2] + 1)))
-                elif ab == set(size[1:]):
-                    new_size = tuple(sorted((size[1], size[2], size[0] + 1)))
-                elif ab == set(size[::2]):
-                    new_size = tuple(sorted((size[2], size[0], size[1] + 1)))
-                # Wenn zwei mögliche Nachbarn zur gleichen Größe führen, überspringe den Nachbarn
-                if new_size is not None and new_size not in seen_sizes:
-                    seen_sizes.add(new_size)
+            seen_sizes = set()  # Set für besuchte Größen
+            for i, new_size in get_neighbors(size):
+                # Nachbarn, die bereits besucht wurden, überspringen
+                if i not in seen and (s := tuple(sorted(stack[i]))) not in seen_sizes:
                     # Füge den Nachbarn zu den zu prüfenden Nachbarn hinzu
                     to_check.add((i, new_size))
+                    seen_sizes.add(s)
+
         # Wenn es keine Nachbarn gibt, entferne den aktuellen Knoten aus dem Pfad (backtracking)
         if not to_check:
             path.pop()
