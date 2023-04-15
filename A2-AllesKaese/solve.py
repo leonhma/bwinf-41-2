@@ -24,10 +24,17 @@ def vanilla(stack: List[Tuple[int, int]]) -> Tuple:
         ret = (lookup[a] | lookup[b]) - {i}
         return ret
 
-    # Liste der Start-Scheiben (sortiert nach Größe)
-    start_nodes_i = list(
+    # Liste der Start-Scheiben (sortiert nach Größe, dedupliziert nach Größe)
+    start_nodes_i = []
+    seen_start_sizes = set()
+    for node in list(
         sorted(range(len(stack)), key=lambda i: stack[i][0] * stack[i][1])
-    )
+    ):
+        size = tuple(sorted(stack[node]))
+        if size not in seen_start_sizes:
+            start_nodes_i.append(node)
+            seen_start_sizes.add(size)
+
     # Besuchte Knoten
     seen = set()
     # Besuchter Pfad mit Größe und zu prüfenden Nachbarn (für backtracking)
@@ -38,7 +45,7 @@ def vanilla(stack: List[Tuple[int, int]]) -> Tuple:
             if start_nodes_i:
                 start = start_nodes_i.pop(0)
                 path = [[start, tuple(stack[start] + (1,)), None]]
-                continue
+                continue  # Diese Iteration überspringen
             else:
                 # Es kann keine Lösung gefunden werden
                 return
@@ -65,6 +72,7 @@ def vanilla(stack: List[Tuple[int, int]]) -> Tuple:
                     new_size = tuple(sorted((size[1], size[2], size[0] + 1)))
                 elif ab == set(size[::2]):
                     new_size = tuple(sorted((size[2], size[0], size[1] + 1)))
+                # Wenn zwei mögliche Nachbarn zur gleichen Größe führen, überspringe den Nachbarn
                 if new_size is not None and new_size not in seen_sizes:
                     seen_sizes.add(new_size)
                     # Füge den Nachbarn zu den zu prüfenden Nachbarn hinzu
@@ -75,6 +83,7 @@ def vanilla(stack: List[Tuple[int, int]]) -> Tuple:
             seen.remove(current)
             continue
         # Aktualisiere die zu prüfenden Nachbarn im Pfad
+        # (nötig wenn die Nachbarn gerade generiert wurden)
         path[-1][2] = to_check
         # Der nächste Knoten ist der erste Nachbar, der noch nicht besucht wurde
         next_ = to_check.pop()
@@ -82,6 +91,9 @@ def vanilla(stack: List[Tuple[int, int]]) -> Tuple:
 
 
 def covers(it1, it2) -> Tuple | None:
+    """Prüft, ob eine Scheibe auf eine andere Scheibe passt.
+    Auch Unterschiede von 1 in einer Dimension sind erlaubt.
+    Gibt eine Maske von hinzugefügten Scheiben zurück."""
     it1_ = tuple(sorted(it1))
     masks = ((0, 0), (0, 1), (1, 0))
     for mask in masks:
@@ -90,14 +102,16 @@ def covers(it1, it2) -> Tuple | None:
 
 
 def create_virtual(ab: List, mask: Tuple, ignoredsize: int) -> Tuple or None:
-    """Erstellt eine virtuelle Scheibe aus einer Scheibe und einer Maske."""
-    if not any(mask):  # no need to create virtual
+    """Erstellt eine aufgegessene (virtuelle) Scheibe aus einer Scheibe und einer Maske."""
+    if not any(mask):  # Nicht nötig eine virtuelle Scheibe zu erstellen
         return
 
+    # Länge in die Dimension, die nicht passend sein muss x Länge der passenden Dimension
     return (ignoredsize, ab[mask.index(0)])
 
 
 def remove(slice: Tuple[int, int], size: List[int]):
+    """Verändere `size` indem eine Scheibe `slice` entfernt wird."""
     ab = set(slice)
     if ab == set(size[:2]):
         size[2] -= 1
@@ -110,12 +124,11 @@ def remove(slice: Tuple[int, int], size: List[int]):
 
 
 # pylama:ignore=C901
-# step through solutions to the problem (includes missing cheese).
-# Return a solution before backtracking starts
 def fuzzy(stack: List[Tuple[int, int]]):
-    """Lösen des Problems mit fehlerhaftem Käsestack und mehreren Käseblöcken."""
+    """Lösen des Problems mit fehlerhaftem Käsestack und mehreren Käseblöcken.
+    Gibt eine Liste von möglichen Lösungen zurück."""
 
-    # Dictionary der Lösungen und ihrer Größe
+    # Dictionary der Lösungen, ihrer Größe und der Anzahl der hinzugefügten/aufgegessenen Scheiben
     solutions = {}
 
     # Hashmap für schnellen Zugriff auf potentielle Nachbarn
@@ -145,7 +158,7 @@ def fuzzy(stack: List[Tuple[int, int]]):
     seen = set()
     # Besuchter Pfad mit Größe und zu prüfenden Nachbarn (für backtracking)
     path = []
-    # Anzahl der hinzugefügten 'aufgegessenen' Scheiben
+    # Anzahl der hinzugefügten/'aufgegessenen' Scheiben
     n_virtual = 0
 
     while True:
@@ -154,11 +167,12 @@ def fuzzy(stack: List[Tuple[int, int]]):
             if start_nodes_i:
                 start = start_nodes_i.pop(0)
                 path = [[0, start, tuple(stack[start] + (1,)), None]]
-                continue
+                continue  # Nächste Iteration
             # Wenn keine Startknoten mehr existieren, sind alle Lösungen gefunden
+            # und können zurückgegeben werden
             for path, size, n_virtual, n_nodes in solutions.values():
                 yield (path, size, n_virtual, n_nodes)
-            return
+            return  # Ende der Funktion
         # Aktueller Knoten, Größe und zu prüfende Nachbarn, und eingefügte 'aufgegessene' Scheiben
         _, current, size, to_check = path[-1]
         # Füge den aktuellen Knoten zu den besuchten Knoten hinzu
@@ -194,6 +208,7 @@ def fuzzy(stack: List[Tuple[int, int]]):
                             create_virtual(ab, s, size[1]),
                         )
                     )
+                # Dedupliziere Nachbarn mit gleicher Größe
                 for new_size, virtual in new_sizes:
                     if new_size not in seen_sizes:
                         seen_sizes.add(new_size)
@@ -205,6 +220,7 @@ def fuzzy(stack: List[Tuple[int, int]]):
         path[-1][3] = to_check
         # Wenn es keine Nachbarn gibt -> backtracking
         if not to_check:
+            # Lösung speichern
             filteredpath_ = tuple(map(lambda x: x[1], filter(lambda x: not x[0], path)))
             path_ = tuple(map(lambda x: x[1], path))
             solutions[filteredpath_] = min(
@@ -214,6 +230,7 @@ def fuzzy(stack: List[Tuple[int, int]]):
                 ),
                 key=lambda x: sum(x[1]) * x[2],
             )
+            # Alle besuchten Knoten ohne alternativen Nachbarn entfernen
             while path and not path[-1][3]:
                 i = path.pop()[1]
                 seen.remove(i)
@@ -221,26 +238,34 @@ def fuzzy(stack: List[Tuple[int, int]]):
                 if path and path[-1][0] == 1:
                     path.pop()
                     n_virtual -= 1
-            continue
+            continue  # Nächste Iteration
 
         # Der nächste Knoten ist der erste Nachbar, der noch nicht besucht wurde
         next_ = to_check.pop()
         next_node, next_size, next_to_check, virtual = next_
-        if virtual:
+        if virtual:  # Wenn eine virtuelle Scheibe hinzugefügt werden muss
             path.append([1, virtual])  # 1, virtual size
             n_virtual += 1
         path.append([0, next_node, next_size, next_to_check])
 
 
 def make_stacks(stack: List[Tuple[int, int]], n: int):
+    """Erstelle `n` Blöcke aus `stack`"""
+    # Für jede Kombination aus `n` Pfaden
     for c in itertools.combinations(fuzzy(stack), n):
+        # Wird die Anzahl der Überflüssigen Scheiben berechnet
         overflow = sum(x[3] for x in c) - len(stack)
+        # Wenn die Pfade insgesamt zu wenige Schieben haben, überspringen
         if overflow < 0:
             continue
+        # Für jede Kombination die Pfade zu kürzen
         for x in itertools.product(range(overflow + 1), repeat=n):
-            if sum(x) != overflow:
+            if (
+                sum(x) != overflow
+            ):  # sodass die richtige Anzahl an Scheiben entfernt wird
                 continue
             try:
+                # werden alle Pfade gekürzt
                 paths = []
                 for i, p in enumerate(c):
                     path, size, n_virtual = list(p[0]), list(p[1]), p[2]
@@ -253,8 +278,11 @@ def make_stacks(stack: List[Tuple[int, int]], n: int):
                             n_virtual -= 1
 
                     paths.append((tuple(path), tuple(size), n_virtual))
+            # Wenn ein Pfad zu kurz ist, um gekürzt zu werden,
+            # wird die nächste Kombination ausprobiert
             except IndexError:
                 continue
+            # Jetzt wird das Ergebnis überprüft,
             if any(len(p) == 0 for p, _, _ in paths):
                 continue
             seen = set()
@@ -263,5 +291,6 @@ def make_stacks(stack: List[Tuple[int, int]], n: int):
                     if isinstance(i, tuple):
                         continue
                     seen.add(i)
+            # und wenn vollständig, zurückgegeben
             if len(seen) == len(stack):
                 yield tuple(paths)
