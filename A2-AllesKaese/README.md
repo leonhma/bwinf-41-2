@@ -23,13 +23,13 @@ Um zu sehen, ob zwei Scheiben zusammengefügt werden können, wird die folgende 
 
 *Beweis*: Wenn eine Scheibe nach einer anderen hinzugefügt wird, muss sie sich mit ihr mindestens eine Kante von gleicher Länge teilen.
 
-Eine Scheibe, die diese Bedingungen erfüllt, passt aber nicht immer auf den Quader. Zusätzlich muss während des Aufbaus also noch geprüft werden, ob die Scheibe wirklich die gleichen Dimensionen wie eine Seite des Quaders hat.
+Eine Scheibe, die diese Bedingungen erfüllt, passt aber nicht immer auf den Quader. Zusätzlich muss während des Aufbaus also noch geprüft werden, ob die Scheibe wirklich die gleichen Dimensionen wie eine Seite des aktuellen Quaders hat.
 
-Durch einen Backtracking-Algorithmus werden mögliche Nachbarn ausprobiert, bis die Lösung gefunden wurde. Alle Kombinationen auszuprobieren scheint ineffizient, lässt sich aber durch ein paar Tricks so optimieren, dass auch in $1.5 \;\text{Millionen}$ Scheiben noch eine Lösung gefunden werden kann.
+Durch einen Backtracking-Algorithmus werden mögliche Nachbarn ausprobiert, bis die Lösung gefunden wurde. Alle Kombinationen auszuprobieren scheint ineffizient, lässt sich aber durch ein paar Tricks so optimieren, dass auch unter $1.5$ Millionen Scheiben noch eine Lösung gefunden werden kann.
 
 ## Umsetzung
 
-Zuerst werden die Scheiben in eine Liste geladen. Aus dieser  wird nun eine Lookup-Tabelle von Seitenlänge zum Index in der Liste erstellt, um effizienter auf potentiell anfügbare Scheiben zugreifen zu können. So werden Pfade, die sicher nicht zu einem Ergebnis führen vorzeitig ausgeschlossen. Nun wird ein Backtracking-Algorithmus angewendet. Es werden immer weiter passende Scheiben hinzugefügt, und falls keine weitere Lösung möglich ist, wird der Pfad zurückvefolgt, bis es weitere mögliche Nachbarn gibt und dieser Pfad wird genauso weiterverfolgt. Wird die Lösung gefunden, wird diese zurückgegeben.
+Zuerst werden die Scheiben in eine Liste geladen. Aus dieser  wird nun eine Lookup-Tabelle von Seitenlänge zum Index in der Liste erstellt, um effizienter auf potentiell anfügbare Scheiben zugreifen zu können. So werden Pfade, die sicher nicht zu einem Ergebnis führen vorzeitig ausgeschlossen. Nun wird ein Backtracking-Algorithmus angewendet. Es werden immer weiter passende Scheiben hinzugefügt, und falls keine weitere Lösung möglich ist, wird der Pfad zurückvefolgt, bis es weitere mögliche Nachbarn gibt und dieser Pfad wird genauso weiterverfolgt. Wird die Lösung gefunden, wird sie zurückgegeben.
 
 Das Programm (`program.py`) ist in Python geschrieben und mit einer Umgebung ab der Version `3.8` ausführbar. Es werden nur Standard-Bibliotheken verwendet. Wird das Program aufgerufen, fragt es nach der Zahl des Beispiels und berechnet die Lösung für dieses anschließend. Zusätzlich wird diese Lösung für die BWINF-Beispiele in Textform in dem Ordner `output` gespeichert. Jede Zeile beschreibt eine Scheibe aus dem Beispiel in der Reihenfolge, in der sie hinzugefügt werden. Bonus: Ein Programm zur Verifizierung der Ergebnisse befindet sich im IPython-Notebook `test.ipynb`.
 
@@ -51,13 +51,13 @@ Auch wenn Antje an einem Tag mehrfach telefoniert, und alle Käsescheiben vermis
 
 Im Folgenden wird Die Laufzeit des ursprünglichen Algorithmus analysiert.
 
-Bei solchen Problemen liegt es nahe, einfach alle Kombinationen auszuprobieren, was eine Laufzeit von $\mathcal O(n!)$ bedeuten würde.
+Bei solchen Problemen liegt es nahe, einfach alle Kombinationen auszuprobieren, was eine Laufzeit von $ O(n!)$ bedeuten würde.
 
-Nun kann man aber feststellen, dass an einen Quader von beliebiger Größe $a \times b\times c$ nur maximal drei Scheiben ($a \times b$, $b\times c$ und $a\times c$) angefügt werden können. Weitere Scheiben mit den gleichen Maßen können vernachlässigt werden, da diese logischerweise zu derselben Lösung führen würden. Wenn nun also für jede mögliche Start-Scheibe alle Kombinationen ausprobiert werden, ergibt sich eine Worst-Case Zeitkomplexität von $\mathcal O(n*3^{n-1})$,  wobei die Basis $3$ die maximale Anzahl der Nachbaren ist.
+Nun kann man aber feststellen, dass an einen Quader von beliebiger Größe $a \times b\times c$ nur maximal drei Scheiben ($a \times b$, $b\times c$ und $a\times c$) angefügt werden können. Weitere Scheiben mit den gleichen Maßen können vernachlässigt werden, da diese logischerweise zu derselben Lösung führen würden. Wenn nun also für jede mögliche Start-Scheibe alle Kombinationen ausprobiert werden, ergibt sich eine Worst-Case Zeitkomplexität von $ O(n*3^{n-1})$,  wobei die Basis $3$ die maximale Anzahl der Nachbaren ist.
 
 Das ist nun aber die Worst-Case Laufzeit des Programmes. In Wirklichkeit liegt die (experimetell ermittelte) durchnittliche Anzahl an Nachbarn während dem Lösungsvorgang zwischen $1.00000$ und $1.04167$.
 
-Somit befindet sich auch die Zeitkomplexität im Bereich zwischen $\mathcal O(n*1.00^{n-1}) \approx \mathcal O(n)$ und $\mathcal O(n*1.04^{n-1})$.
+Somit befindet sich auch die Zeitkomplexität im Bereich zwischen $O(n1.00^{n-1}) \approx  O(n)$ und $ O(n1.04^{n-1})$.
 
 ### Komplexität
 
@@ -65,7 +65,7 @@ Das Problem (eine Lösung zu finden) kann auf ein Hamiltonian-Path-Problem reduz
 
 ### Einzigartigkeit
 
-Wurde eine Lösung gefunden ist diese auch die einzige mögliche Lösung. Dies ist natürlich nur der Fall, wenn Nachbarn mit der gleichen größe dedupliziert werden. Das ist so, weil das Hinzufügen einer Scheibe an falscher Stelle dazu führt, dass die fälschlicherweise nicht hinzugefügte Scheibe nicht mehr auf den Quader passt, da dieser zu groß geworden ist um sie später noch hinzuzufügen. Welche Scheibe im Fall von mehreren Nachbaren nun die Richtige ist, kann aber nur durch Probieren ermittelt werden, da eine falsche Wahl erst später auffällt, wenn keine Scheiben mehr hinzugefügt werden können und übrig bleiben würden.
+Wurde eine Lösung gefunden ist diese auch die einzige mögliche Lösung. Dies ist natürlich nur der Fall, wenn Nachbarn mit der gleichen größe dedupliziert werden. Die Lösung ist einzigartig, weil das Hinzufügen einer Scheibe an falscher Stelle dazu führt, dass die fälschlicherweise nicht hinzugefügte Scheibe nicht mehr auf den Quader passt, da dieser zu groß geworden ist um sie später noch hinzuzufügen. Welche Scheibe im Fall von mehreren Nachbaren nun die Richtige ist, kann aber nur durch Probieren ermittelt werden, da eine falsche Wahl erst später auffällt, wenn keine Scheiben mehr hinzugefügt werden können und übrig bleiben würden.
 
 ## Beispiele
 
