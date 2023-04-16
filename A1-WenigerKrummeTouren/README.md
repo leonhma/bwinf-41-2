@@ -27,28 +27,30 @@ Wie man sieht kann hier (leicht überprüfbar) kein Pfad gefunden werden, der di
 
 Modelliert wird diese Aufgabenstellung mit einem Integer-Linear-Programming Modell, bestehend aus einer Matrix von binären Variablen die angeben, ob zwischen zwei Knoten eine Verbindung besteht.
 
-Diese Aufgabe (die Suche nach einem möglichst kurzen Pfad) ähnelt sehr stark dem Travelling-Salesman-Problem, und teilt mit diesem auch seine Klassifizierung als NP-Schwer. Während die Suche nach einer beliebigen Lösung, die die Abiegewinkel- und Vorgaben zu den Grapheigenschaften erfüllt durch ILP auf ein SAT-Problem reduziert werden kann und somit NP-Komplett ist, ist die Suche nach einer optimalen Lösung NP-Schwer, da sich eine Lösung nicht in Polynom-Zeit verifizieren lässt. Ein ähnlicher Aufwand muss für den Beweis der Unauffindbarkeit einer möglichen Route vollbracht werden. Dieser Befindet sich als Umkehrung des vorher genannten SAT-Problems in der Klasse co-NP.
+Diese Aufgabe (die Suche nach einem möglichst kurzen Pfad) ähnelt sehr stark dem Travelling-Salesman-Problem, und teilt mit diesem auch seine Klassifizierung als NP-Schwer. Während die Suche nach einer beliebigen Lösung, die die Abiegewinkel- und Vorgaben zu den Grapheigenschaften erfüllt durch ILP auf ein Boolean-Satisfiability-Problem reduziert werden kann und somit NP-Komplett ist, ist die Suche nach einer optimalen Lösung (reduzierbar auf das Shortest-Hamiltonian-Path-Problem) NP-Schwer. Ein ähnlicher Aufwand muss für den Beweis der Unauffindbarkeit einer möglichen Route vollbracht werden. Dieser befindet sich als Umkehrung des vorher genannten SAT-Problems in der Klasse co-NP.
 
 ## Umsetzung
 
-Wie vorher genannt wird die Aufgabenstellung als Integer-Linear-Programming Problem formuliert. ($W$ sei $V\cup\set{-1}$.) Hierzu wird eine 2d-Matrix an binären Variablen $x_{ij}\quad(i,j)\in W$ erstellt, die besagt, ob ein Knoten $i$ mit dem Knoten $j$ verbunden ist. Der Index $-1$ wird verwendet, um den Start und das Ende der Tour zu markieren und wird in der Wegkosten- und Winkelberechnung nicht berücksichtigt.
+Wie vorher genannt wird die Aufgabenstellung als Integer-Linear-Programming Problem formuliert. ($W$ sei $V\cup\set{-1}$.) Hierzu wird eine 2d-Adjazenzmatrix an binären Variablen $x_{ij}\quad(i,j)\in W$ erstellt, die besagt, ob ein Knoten $i$ mit dem Knoten $j$ verbunden ist. Der Index $-1$ wird verwendet, um den Start und das Ende der Tour zu markieren und wird in der Wegkosten- und Winkelberechnung nicht berücksichtigt.
 
 Um bei jedem Knoten einen Grad von $\delta(v)=2\quad v\in W$ sicherzustellen, werden zwei Bedingungen eingeführt:
-$$\sum_{j\in W}x_{ij} = 1\qquad i \in W\tag 1$$
-$$\sum_{i\in W}x_{ij} = 1\qquad j \in W\tag 2$$
+$$\sum_{j\in W}x_{ij} = 1\qquad \forall i \in W\tag 1$$
+$$\sum_{i\in W}x_{ij} = 1\qquad \forall j \in W\tag 2$$
 
-Als weitere Bedingung müssen noch disjunkte Teilstrecken verhindert werden. Diese entstehen wenn ein Knoten mit einem Knoten verbunden ist, der schon vorher in der Tour enthalten war. Diese Bedingung wird für den Knoten $-1$ nicht durchgesetzt, da dieser sowohl am Start, als auch am Ende der Tour enthalten sein muss. Um diese Bedingung zu modellieren werden entsprechend der [MTZ-Methode](https://how-to.aimms.com/Articles/332/332-Miller-Tucker-Zemlin-formulation.html) $t_i \quad i \in V$ weitere ganzzahlige Variablen eingeführt, welche die Position der Knotenpunkte in der Tour angeben. Zusätzlich wird diese Bedingung aufgestellt:
+Als weitere Bedingung müssen noch disjunkte Teilstrecken verhindert werden. Diese entstehen, wenn ein Knoten mit einem Knoten verbunden ist, der schon vorher in der Tour enthalten war. Diese Bedingung wird für den Knoten $-1$ nicht durchgesetzt, da dieser sowohl am Start, als auch am Ende der Tour enthalten sein muss. Um diese Bedingung zu modellieren werden entsprechend der [MTZ-Methode](https://how-to.aimms.com/Articles/332/332-Miller-Tucker-Zemlin-formulation.html) $t_i \quad \forall i \in V$ weitere ganzzahlige Variablen eingeführt, welche die Position der Knotenpunkte in der Tour angeben. Zusätzlich wird diese Bedingung aufgestellt:
 
-$$x_{ij} \implies t_i < t_j \qquad (i, j) \in V^2 \tag 3$$
+$$x_{ij} \implies t_i < t_j \qquad\forall (i, j) \in V^2 \tag 3$$
 
 Zuletzt muss noch die Winkel-Vorgabe berücksichtigt werden. Vor dem eigentlichen Vorgang des Lösens werden alle Winkel mit dem Kreuzprodukt von Vektoren vorberechnet und in einer 3d-Matrix $a$ gespeichert. So ergibt sich:
-$$x_{ij} \wedge x_{jk} \implies a_{ijk} \le 90 \qquad (i, j, k) \in V^3 \tag 4$$
+$$x_{ij} \wedge x_{jk} \implies a_{ijk} \le 90 \qquad\forall (i, j, k) \in V^3 \tag 4$$
 
-Als zu minimierende Funktion wird der Gesamtweg berechnet. $c_{ij}\quad (i, j)\in V^2$ sei der Abstand zwischen den Knoten $i$ und $j$.
+Als zu minimierende Funktion wird der Gesamtweg berechnet. $c_{ij}\quad \forall (i, j)\in V^2$ sei der Abstand zwischen den Knoten $i$ und $j$.
 $$\text{min}\quad\sum_{i \in V}\sum_{j \in V}c_{ij} x_{ij}\tag{5}$$
 
+Wie jetzt vielleicht auffällt, wird hier mit einem ungerichteten Graphen gearbeitet. Somit wäre die Adjazenzmatrix symmetrisch und nur die Hälfte der Variablen müsste erstellt werden, was vermeintlich zu einer Verringerung des Rechenaufwandes führen würde. In einem ungerichteten Graphen müsste nun aber die [DFJ-Methode](https://how-to.aimms.com/Articles/332/332-Explicit-Dantzig-Fulkerson-Johnson-formulation.html) zur Subtour-Elimination verwendet werden, was mit einer exponentiellen Anzahl an Bedingungen verbunden ist. Auch dieser Ansatz wurde mit [Lazy-Constraints](https://orinanobworld.blogspot.com/2012/08/user-cuts-versus-lazy-constraints.html) in anderen Solvern getestet, hat aber nicht näherungsweise vergleichbare Ergebnisse geliefert.
+
 Im Quelltext sind diese Beschränkungen in [linearisierter](https://download.aimms.com/aimms/download/manuals/AIMMS3OM_IntegerProgrammingTricks.pdf) Form zu finden.
-Das Programm ist in der Sprache Python umgesetzt und ab der Version `3.6` ausführbar. Zur Lösung wird die von Google entwicklete Bibliothek [`ortools`](https://developers.google.com/optimization) neben einigen anderen Paketen verwendet, die mit `pip install -r requirements.txt` installiert werden können. Das Programm erstellt das ILP-Modell, sucht dann mit einem Zeitlimit von 3 Minuten nach einer Lösung und gibt diese aus. Zusätzlich zu einer graphischen Darstellung mithilfe von `networkx` und `pyplot` werden in der Datei `output/wenigerkrumm{}.txt` die Koordinaten ausgegeben, die Anton in sein Navi eingeben muss. Da der Pfad in beide Richtungen abgefahren werden kann, ist es egal ob er am Ende oder Anfang der Datei anfängt.
+Das Programm ist in der Sprache Python umgesetzt und ab der Version `3.6` ausführbar. Zur Lösung wird die von Google entwickelte Bibliothek [`ortools`](https://developers.google.com/optimization) neben einigen anderen Paketen verwendet, die mit `pip install -r requirements.txt` installiert werden können. Das Programm erstellt das ILP-Modell, sucht dann mit einem Zeitlimit von 3 Minuten nach einer Lösung und gibt diese aus. Zusätzlich zu einer graphischen Darstellung mithilfe von `networkx` und `pyplot` werden in der Datei `output/wenigerkrumm{}.txt` die Koordinaten ausgegeben, die Anton in sein Navi eingeben muss. Da der Pfad in beide Richtungen abgefahren werden kann, ist es egal ob er am Ende oder Anfang der Datei anfängt.
 
 ### Verbesserungen
 
@@ -70,7 +72,7 @@ Anton hat ein neues Gefährt bekommen! Jetzt kann er Abbiegewinkel von `110°` m
 
 #### Abbiegewinkel-Minimierung
 
-Einer der weiteren anpassbaren Parameter (`ANGLE_COST_FACTOR`) ermöglicht, den maximalen Abbiegewinkel zu verändern, sodass auch dieser optimiert werden kann. Ein guter Wert scheint `0.002` zu sein. Allerdings wird die Suche dadurch sehr viel langsamer, da die Variable `angle_ub` im ILP-Modell nun nichtmehr auf den Wert von `ANGLE_UPPER_BOUND` fixiert werden kann. Hier ein Ergebnis für Beispiel 3 mit Weglänge `1939.08km` und Winkel-UB `33°`, das mit einer Maximalzeit von 20 Minuten berechnet wurde:
+Einer der weiteren anpassbaren Parameter (`ANGLE_COST_FACTOR`) ermöglicht, den maximalen Abbiegewinkel zu verändern, sodass auch dieser optimiert werden kann. Dazu wird eine weitere Variable `angle_ub` eingeführt, die auch Teil der Kostenfunktion ist. Allerdings wird die Suche dadurch sehr viel langsamer, da die Variable im ILP-Modell nun nicht mehr auf den Wert von `ANGLE_UPPER_BOUND` fixiert werden kann. Ein guter Wert scheint `0.002` zu sein. Hier ein Ergebnis für Beispiel 3 mit Weglänge `1939.08km` und Winkel-UB `33°`, das mit einer Maximalzeit von 20 Minuten berechnet wurde:
 
 ![Kreise](./static/3-angle-20min.png)
 
@@ -88,9 +90,11 @@ Abbiegewinkel in der Lösung, die größer als `ANGLE_UPPER_BOUND` sind, werden 
 
 ### Qualität der Ergebnisse
 
-Das Integer-Linear-Programming Verfahren ist in der Lage, optimale Ergebnisse zu finden ('optimal' heißt hier nicht 'exklusiv optimal'). Da aber einige sehr große Instanzen bearbeitet werden, werden in drei Minuten teilweise nur sinnvolle Lösungen erreicht.
+Das Integer-Linear-Programming Verfahren ist in der Lage, optimale Ergebnisse zu finden ('optimal' heißt hier nicht immer 'exklusiv optimal'). Da aber einige sehr große Instanzen bearbeitet werden, werden in drei Minuten teilweise nur sinnvolle Lösungen erreicht.
 
 Das liegt daran, dass im ILP-Modell sowohl Variablen als auch Bedingungen in grob quadratisch wachsender Anzahl erstellt werden. Auf einem Desktop-System mit 16 logischen Kernen @4.6GHz werden alle Beispiele außer `6` und `7` optimal gelöst. Für diese Aufgaben wird aber eine zufriedenstellende mögliche Lösung gefunden.
+
+Zusätzlich wird die beste untere Grenze die während der Suche gefunden wurde ausgegeben. Dieser Wert ist aber immer noch durch die Integralitäts-Bedingungen der Aufgabenstellung gebunden, und somit nicht mit der LP-Relaxation gleich zu setzen.
 
 ## Beispiele
 
@@ -114,6 +118,8 @@ Zeit: 0.03s
 Status: OPTIMAL
 Länge: 11.14km
 Winkel-UB: 90°
+Kostenfunktion: 11.14
+Best-Bound: 11.14
 ```
 *pyplot*
 
@@ -149,6 +155,8 @@ Zeit: 24.08s
 Status: OPTIMAL
 Länge: 847.43km
 Winkel-UB: 90°
+Kostenfunktion: 847.43
+Best-Bound: 847.43
 ```
 
 *pyplot*
@@ -187,6 +195,8 @@ Zeit: 16.97s
 Status: OPTIMAL
 Länge: 2183.66km
 Winkel-UB: 90°
+Kostenfunktion: 2183.66
+Best-Bound: 2183.66
 ```
 
 *pyplot*
@@ -225,6 +235,8 @@ Zeit: 162.83s
 Status: OPTIMAL
 Länge: 1848.05km
 Winkel-UB: 90°
+Kostenfunktion: 1848.05
+Best-Bound: 1848.05
 ```
 
 *pyplot*
@@ -263,6 +275,8 @@ Zeit: 0.63s
 Status: OPTIMAL
 Länge: 1205.07km
 Winkel-UB: 90°
+Kostenfunktion: 1205.07
+Best-Bound: 1205.07
 ```
 
 *pyplot*
@@ -301,6 +315,8 @@ Zeit: 47.33s
 Status: OPTIMAL
 Länge: 3257.92km
 Winkel-UB: 90°
+Kostenfunktion: 3257.92
+Best-Bound: 3257.92
 ```
 
 *pyplot*
@@ -335,10 +351,12 @@ Bitte Zahl des Beispiels eingeben: 6
 Anzahl der Variablen: 6561
 Anzahl der Bedingungen: 518402
 
-Zeit: 191.80s
+Zeit: 190.92s
 Status: FEASIBLE
-Länge: 3499.26km
+Länge: 3457.99km
 Winkel-UB: 90°
+Kostenfunktion: 3457.99
+Best-Bound: 3370.21
 ```
 
 *pyplot*
@@ -373,10 +391,12 @@ Bitte Zahl des Beispiels eingeben: 7
 Anzahl der Variablen: 10201
 Anzahl der Bedingungen: 1010002
 
-Zeit: 202.21s
+Zeit: 201.67s
 Status: FEASIBLE
-Länge: 4217.62km
+Länge: 4194.83km
 Winkel-UB: 90°
+Kostenfunktion: 4194.83
+Best-Bound: 4029.02
 ```
 
 *pyplot*
@@ -418,7 +438,7 @@ from ortools.linear_solver import pywraplp
 
 ANGLE_UPPER_BOUND = 90
 ANGLE_COST_FACTOR = 0  # 0.002
-SOLVER_MAX_TIME = 60 * 20  # 3 Minuten Berechnungszeit
+SOLVER_MAX_TIME = 60 * 3  # 3 Minuten Berechnungszeit
 
 
 class ExitException(BaseException):
@@ -591,6 +611,8 @@ def main(points: List[Tuple[float, float]], fname: str):
         print(f"Status: {status_name}")
         print(f"Länge: {length:.2f}km")
         print(f"Winkel-UB: {int(angle_ub.solution_value())}°")
+        print(f"Kostenfunktion: {solver.Objective().Value():.2f}")
+        print(f"Best-Bound: {solver.Objective().BestBound():.2f}")
 
         # Rote Farbe für Winkel > ANGLE_UPPER_BOUND
         for node in G.nodes:
@@ -609,7 +631,7 @@ def main(points: List[Tuple[float, float]], fname: str):
         colorsd = nx.get_node_attributes(G, "color")
         colors = [colorsd.get(node, "w") for node in G.nodes]
 
-        nx.draw(G, pos, node_size=10, font_size=8, node_color=colors, edgecolors="k")
+        nx.draw(G, pos, node_size=25, font_size=8, node_color=colors, edgecolors="k")
 
         plt.show()  # Anzeigen des Graphen
     else:

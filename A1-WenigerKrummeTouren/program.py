@@ -12,7 +12,7 @@ from ortools.linear_solver import pywraplp
 
 ANGLE_UPPER_BOUND = 90
 ANGLE_COST_FACTOR = 0  # 0.002
-SOLVER_MAX_TIME = 60 * 20  # 3 Minuten Berechnungszeit
+SOLVER_MAX_TIME = 60 * 3  # 3 Minuten Berechnungszeit
 
 
 class ExitException(BaseException):
@@ -185,6 +185,8 @@ def main(points: List[Tuple[float, float]], fname: str):
         print(f"Status: {status_name}")
         print(f"Länge: {length:.2f}km")
         print(f"Winkel-UB: {int(angle_ub.solution_value())}°")
+        print(f"Kostenfunktion: {solver.Objective().Value():.2f}")
+        print(f"Best-Bound: {solver.Objective().BestBound():.2f}")
 
         # Rote Farbe für Winkel > ANGLE_UPPER_BOUND
         for node in G.nodes:
