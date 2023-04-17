@@ -15,11 +15,13 @@
 
 ## Lösungsidee
 
-Die Aufgabe wird als ein kompletter Graph $G(V, E)$ dargestellt. Hierbei sind $V$ die Scheiben, und die Kanten $E$ repräsentieren ein Aufeinanderfolgen dieser Scheiben. Nun gilt es einen Hamiltonpfad in diesem Graphen zu finden, der die geometrischen Bedingungen der orthogonalen Schnitte erfüllt. Existiert dieser, gibt es für diese Käsescheiben eine Lösung und der Hamilton-Pfad (startend von der End-Scheibe mit der kleineren Fläche) ist die Reihenfolge, in der die Scheiben wieder zusammengefügt werden können.
+Die Aufgabe wird als ein kompletter Graph $G(V, E)$ dargestellt. Hierbei sind die Knoten $V$ die Scheiben, und die Kanten $E$ repräsentieren ein Aufeinanderfolgen dieser Scheiben. Nun gilt es einen Hamiltonpfad in diesem Graphen zu finden, der die geometrischen Bedingungen der orthogonalen Schnitte erfüllt. Existiert dieser, gibt es für diese Käsescheiben eine Lösung und der Hamilton-Pfad (startend von der End-Scheibe mit der kleineren Fläche) ist die Reihenfolge, in der die Scheiben wieder zusammengefügt werden können.
 
-Um zu sehen, ob zwei Scheiben zusammengefügt werden können, wird die folgende Beobachtung verwendet:
+Um zu sehen, ob zwei Scheiben überhaupt aufeinander folgen können, wird die folgende Beobachtung verwendet:
 
-**Lemma 1**: Auf den Quader kann eine Scheibe nur nach einer anderen hinzugefügt werden, wenn sie in mindestens einer der beiden Größen mit der vorherigen übereinstimmt.
+**Lemma 1**: Auf den Quader kann eine Scheibe nur nach einer anderen Scheibe hinzugefügt werden, wenn sie in mindestens einer der beiden Größen mit der vorherigen übereinstimmt.
+
+![Quader mit zwei aufeinanderfolgenden Scheiben, die sich ein Kante teilen](./static/cube.png)
 
 *Beweis*: Wenn eine Scheibe nach einer anderen hinzugefügt wird, muss sie sich mit ihr mindestens eine Kante von gleicher Länge teilen.
 
