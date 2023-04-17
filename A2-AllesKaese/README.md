@@ -425,7 +425,7 @@ if __name__ == "__main__":
                     # Ausgabe von Lösungswerten
                     print(f"Zeit: {time.time()-start_time:.2f}s")
                     print("Reihenfolge: ", end="")
-                    if len(path) < 10:
+                    if len(path) < 20:
                         print(
                             " -> ".join(
                                 map(lambda x: f"{stack[x][0]}x{stack[x][1]}", path)

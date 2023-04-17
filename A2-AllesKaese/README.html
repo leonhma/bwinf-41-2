@@ -30248,7 +30248,7 @@ Anzahl aufgegessener Scheiben: 0
                     <span class="pl-c"># Ausgabe von Lösungswerten</span>
                     <span class="pl-en">print</span>(<span class="pl-s">f"Zeit: <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">time</span>.<span class="pl-en">time</span>()<span class="pl-c1">-</span><span class="pl-s1">start_time</span>:.2f<span class="pl-kos">}</span></span>s"</span>)
                     <span class="pl-en">print</span>(<span class="pl-s">"Reihenfolge: "</span>, <span class="pl-s1">end</span><span class="pl-c1">=</span><span class="pl-s">""</span>)
-                    <span class="pl-k">if</span> <span class="pl-en">len</span>(<span class="pl-s1">path</span>) <span class="pl-c1">&lt;</span> <span class="pl-c1">10</span>:
+                    <span class="pl-k">if</span> <span class="pl-en">len</span>(<span class="pl-s1">path</span>) <span class="pl-c1">&lt;</span> <span class="pl-c1">20</span>:
                         <span class="pl-en">print</span>(
                             <span class="pl-s">" -&gt; "</span>.<span class="pl-en">join</span>(
                                 <span class="pl-en">map</span>(<span class="pl-k">lambda</span> <span class="pl-s1">x</span>: <span class="pl-s">f"<span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">stack</span>[<span class="pl-s1">x</span>][<span class="pl-c1">0</span>]<span class="pl-kos">}</span></span>x<span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">stack</span>[<span class="pl-s1">x</span>][<span class="pl-c1">1</span>]<span class="pl-kos">}</span></span>"</span>, <span class="pl-s1">path</span>)
